@@ -1,0 +1,42 @@
+[
+  {
+    "sku": "SKU001",
+    "name": "Wireless Keyboard",
+    "category": "Electronics",
+    "quantity": 25,
+    "location": "Rack A",
+    "priority": 5
+  },
+  {
+    "sku": "SKU002",
+    "name": "Wireless Mouse",
+    "category": "Electronics",
+    "quantity": 8,
+    "location": "Rack B",
+    "priority": 8
+  },
+  {
+    "sku": "SKU003",
+    "name": "USB Cable",
+    "category": "Accessories",
+    "quantity": 6,
+    "location": "Rack C",
+    "priority": 9
+  },
+  {
+    "sku": "SKU004",
+    "name": "Notebook",
+    "category": "Stationery",
+    "quantity": 120,
+    "location": "Rack D",
+    "priority": 2
+  },
+  {
+    "sku": "SKU005",
+    "name": "Headphones",
+    "category": "Electronics",
+    "quantity": 12,
+    "location": "Rack C",
+    "priority": 7
+  }
+]

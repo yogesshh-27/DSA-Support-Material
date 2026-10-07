@@ -1,0 +1,32 @@
+{
+  "vertices": [
+    {"id": 0, "name": "Receiving", "x": 80, "y": 200},
+    {"id": 1, "name": "Rack A", "x": 220, "y": 100},
+    {"id": 2, "name": "Rack B", "x": 220, "y": 300},
+    {"id": 3, "name": "Rack C", "x": 420, "y": 100},
+    {"id": 4, "name": "Rack D", "x": 420, "y": 300},
+    {"id": 5, "name": "Packing Zone", "x": 600, "y": 150},
+    {"id": 6, "name": "Dispatch Bay", "x": 750, "y": 250}
+  ],
+  "edges": [
+    {"u": 0, "v": 1, "weight": 4},
+    {"u": 0, "v": 2, "weight": 6},
+    {"u": 1, "v": 2, "weight": 3},
+    {"u": 1, "v": 3, "weight": 7},
+    {"u": 2, "v": 3, "weight": 4},
+    {"u": 2, "v": 4, "weight": 8},
+    {"u": 3, "v": 4, "weight": 2},
+    {"u": 3, "v": 5, "weight": 5},
+    {"u": 4, "v": 5, "weight": 6},
+    {"u": 4, "v": 6, "weight": 9},
+    {"u": 5, "v": 6, "weight": 3}
+  ],
+  "default_knapsack_items": [
+    {"name": "Medical Kit", "weight": 4, "value": 10},
+    {"name": "Packaged Food", "weight": 3, "value": 7},
+    {"name": "Electronics", "weight": 5, "value": 12},
+    {"name": "Stationery", "weight": 2, "value": 4},
+    {"name": "Tools", "weight": 6, "value": 13}
+  ],
+  "default_capacity": 10
+}
