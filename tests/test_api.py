@@ -18,6 +18,20 @@ def reset_state():
 client = TestClient(app)
 
 
+def test_frontend_serving():
+    res = client.get("/")
+    assert res.status_code == 200
+    assert "Smart Warehouse" in res.text
+
+    css = client.get("/static/css/style.css")
+    assert css.status_code == 200
+    assert "app-sidebar" in css.text
+
+    js = client.get("/static/js/app.js")
+    assert js.status_code == 200
+    assert "App" in js.text
+
+
 def test_api_inventory_crud():
     # 1. Get initial inventory
     res = client.get("/inventory")

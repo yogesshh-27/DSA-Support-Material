@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Warehouse Inventory Management Platform | DSA-II PBL</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="app-sidebar">
+    <div class="sidebar-header">
+      <h1>Smart Warehouse</h1>
+      <p>DSA-II Academic Prototype</p>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-link active" data-section="dashboard">
+        <span>01</span> Dashboard
+      </a>
+      <a class="nav-link" data-section="inventory">
+        <span>02</span> Inventory / AVL Tree
+      </a>
+      <a class="nav-link" data-section="alerts">
+        <span>03</span> Priority Alerts / Heap
+      </a>
+      <a class="nav-link" data-section="graph">
+        <span>04</span> Warehouse Graph
+      </a>
+      <a class="nav-link" data-section="dijkstra">
+        <span>05</span> Dijkstra Routing
+      </a>
+      <a class="nav-link" data-section="prim">
+        <span>06</span> Prim MST Optimization
+      </a>
+      <a class="nav-link" data-section="floyd">
+        <span>07</span> Floyd-Warshall All-Pairs
+      </a>
+      <a class="nav-link" data-section="knapsack">
+        <span>08</span> 0/1 Knapsack Dispatch
+      </a>
+      <a class="nav-link" data-section="complexity">
+        <span>09</span> Algorithm Complexity
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div>BTech CSE – DSA-II PBL</div>
+      <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.2rem;">All Algorithms Self-Implemented</div>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEWPORT -->
+  <main class="app-main">
+    <div id="feedbackAlert" class="feedback-msg"></div>
+
+    <!-- ============================================================== -->
+    <!-- SECTION 1: DASHBOARD -->
+    <!-- ============================================================== -->
+    <section id="section-dashboard" class="section-panel active">
+      <div class="page-header">
+        <h2 class="page-title">Warehouse Operational Dashboard</h2>
+        <p class="page-subtitle">Real-time overview of warehouse storage, network graph, and active dispatch queues.</p>
+      </div>
+
+      <!-- Overview Statistics -->
+      <div class="card-grid">
+        <div class="stat-widget">
+          <div class="stat-title">Inventory SKUs (AVL Tree)</div>
+          <div class="stat-number" id="dashTotalSkus">-</div>
+          <div class="stat-desc">Self-balancing indexed items</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Total Stock Quantity</div>
+          <div class="stat-number" id="dashTotalUnits">-</div>
+          <div class="stat-desc">Total units in storage racks</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Warehouse Locations (V)</div>
+          <div class="stat-number" id="dashLocations">-</div>
+          <div class="stat-desc">Zones & Racks in graph</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Active Routes (E)</div>
+          <div class="stat-number" id="dashRoutes">-</div>
+          <div class="stat-desc">Weighted aisles & paths</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Alert Queue (Max Heap)</div>
+          <div class="stat-number" id="dashAlertsCount">-</div>
+          <div class="stat-desc">Priority-sorted alerts</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Dispatch Cart Capacity (W)</div>
+          <div class="stat-number" id="dashKnapsackCapacity">10 kg</div>
+          <div class="stat-desc">0/1 Knapsack batch limit</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions Card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">Quick Algorithm Actions</div>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="App.navigateTo('inventory')">Search Inventory (AVL)</button>
+          <button class="btn btn-primary" onclick="App.navigateTo('dijkstra')">Find Shortest Route (Dijkstra)</button>
+          <button class="btn btn-primary" onclick="App.navigateTo('prim')">Generate MST (Prim)</button>
+          <button class="btn btn-primary" onclick="App.navigateTo('floyd')">All-Pairs Distance (Floyd-Warshall)</button>
+          <button class="btn btn-primary" onclick="App.navigateTo('knapsack')">Pack Dispatch Cart (0/1 Knapsack)</button>
+        </div>
+      </div>
+
+      <!-- Highest Priority Alert Banner -->
+      <div class="card">
+        <div class="card-title">
+          <span>Highest Priority Warehouse Alert (O(1) Heap Peek)</span>
+          <span class="badge badge-critical" id="dashTopAlertBadge">Critical</span>
+        </div>
+        <div id="dashTopAlertContent" style="font-size: 0.9rem; color: var(--text-secondary);">
+          Loading active alert queue...
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 2: INVENTORY MANAGEMENT (AVL TREE) -->
+    <!-- ============================================================== -->
+    <section id="section-inventory" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Inventory Management – AVL Tree</h2>
+        <p class="page-subtitle">Fast inventory SKU lookup, insertion, and deletion with strict height-balancing.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">AVL Tree (Self-Balancing BST)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Guarantees logarithmic SKU searches during rapid picking, preventing linear BST degradation.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Item SKU (Key), Name, Category, Quantity, Location, Priority</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Found Record, Rotation counts, Inorder/Preorder Traversals</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">Search: O(log n)</span> <span class="complexity-pill">Insert: O(log n)</span> <span class="complexity-pill">Delete: O(log n)</span></span>
+        </div>
+      </div>
+
+      <!-- Search & Delete Forms Grid -->
+      <div class="card-grid">
+        <!-- Search SKU -->
+        <div class="card">
+          <div class="card-title">Search Item by SKU</div>
+          <form id="formSearchSku" onsubmit="App.handleSearchSku(event)">
+            <div class="form-group">
+              <label class="form-label">Item SKU</label>
+              <div style="display: flex; gap: 0.5rem;">
+                <input type="text" id="searchSkuInput" class="form-control" placeholder="e.g. SKU001" required>
+                <button type="submit" class="btn btn-primary">Search</button>
+              </div>
+            </div>
+          </form>
+          <div id="searchResultArea" style="margin-top: 0.75rem; display: none;"></div>
+        </div>
+
+        <!-- Add Inventory Item -->
+        <div class="card">
+          <div class="card-title">Add New Inventory Item</div>
+          <form id="formAddInventory" onsubmit="App.handleAddInventory(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">SKU</label>
+                <input type="text" id="addSku" class="form-control" placeholder="SKU006" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Item Name</label>
+                <input type="text" id="addName" class="form-control" placeholder="Barcode Reader" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Category</label>
+                <input type="text" id="addCategory" class="form-control" placeholder="Electronics" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Quantity</label>
+                <input type="number" id="addQuantity" class="form-control" min="0" value="10" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Location</label>
+                <input type="text" id="addLocation" class="form-control" placeholder="Rack A" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Priority (1-10)</label>
+                <input type="number" id="addPriority" class="form-control" min="1" max="10" value="5" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Insert into AVL Tree</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- AVL Rotations & Traversal Controls -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>AVL Balancing Statistics & Rotations</span>
+          <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);">Balance condition: |h(L) - h(R)| &le; 1</span>
+        </div>
+        <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem;">
+          <div class="badge">Left Rotations (LL): <strong id="rotLeft">0</strong></div>
+          <div class="badge">Right Rotations (RR): <strong id="rotRight">0</strong></div>
+          <div class="badge">Left-Right (LR): <strong id="rotLR">0</strong></div>
+          <div class="badge">Right-Left (RL): <strong id="rotRL">0</strong></div>
+        </div>
+
+        <div class="tab-nav">
+          <button class="tab-btn active" onclick="App.switchInventoryView('table')">Inventory Table</button>
+          <button class="tab-btn" onclick="App.switchInventoryView('traversals')">Traversals (Inorder / Preorder)</button>
+          <button class="tab-btn" onclick="App.switchInventoryView('tree')">Tree Structure</button>
+        </div>
+
+        <!-- Inventory Table View -->
+        <div id="invViewTable">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>SKU</th>
+                  <th>Item Name</th>
+                  <th>Category</th>
+                  <th>Quantity</th>
+                  <th>Location</th>
+                  <th>Priority</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="inventoryTableBody">
+                <tr><td colspan="7">Loading inventory...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Traversals View -->
+        <div id="invViewTraversals" style="display: none;">
+          <div style="margin-bottom: 1rem;">
+            <h4 style="font-size: 0.85rem; margin-bottom: 0.35rem;">Inorder Traversal (Left &rarr; Root &rarr; Right): Sorted by SKU</h4>
+            <div id="inorderDisplay" class="log-box"></div>
+          </div>
+          <div>
+            <h4 style="font-size: 0.85rem; margin-bottom: 0.35rem;">Preorder Traversal (Root &rarr; Left &rarr; Right): Hierarchy Order</h4>
+            <div id="preorderDisplay" class="log-box"></div>
+          </div>
+        </div>
+
+        <!-- Tree Structure View -->
+        <div id="invViewTree" style="display: none;">
+          <pre id="treeJsonDisplay" class="log-box" style="max-height: 350px;"></pre>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 3: PRIORITY ALERTS (BINARY MAX HEAP) -->
+    <!-- ============================================================== -->
+    <section id="section-alerts" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Priority Alerts – Binary Max Heap</h2>
+        <p class="page-subtitle">Managing critical stockouts and emergency warnings using a priority queue.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">Binary Max Heap / Priority Queue</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Ensures immediate O(1) response to critical inventory events (P=10 Critical Stock &gt; P=8 Low Stock &gt; P=5 Normal).</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Alert (SKU, Alert Type, Priority [1-10], Quantity, Location)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Highest-Priority Alert, Heapified Alert Array</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">Insert: O(log n)</span> <span class="complexity-pill">Peek: O(1)</span> <span class="complexity-pill">Extract-Max: O(log n)</span></span>
+        </div>
+      </div>
+
+      <!-- Top Alert Card & Action -->
+      <div class="card" style="margin-bottom: 1.5rem; border-left: 4px solid var(--danger);">
+        <div class="card-title">
+          <span>Current Top Priority Alert (Root of Heap: A[0])</span>
+          <button class="btn btn-danger btn-sm" onclick="App.handleExtractAlert()">Extract Max Alert (O(log n))</button>
+        </div>
+        <div id="topAlertDetail" style="font-size: 0.9rem; line-height: 1.6;">
+          Loading...
+        </div>
+      </div>
+
+      <div class="card-grid">
+        <!-- Add Alert Form -->
+        <div class="card">
+          <div class="card-title">Insert Warehouse Alert</div>
+          <form id="formAddAlert" onsubmit="App.handleAddAlert(event)">
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">SKU</label>
+                <input type="text" id="alertSku" class="form-control" placeholder="SKU001" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Alert Type</label>
+                <select id="alertType" class="form-control">
+                  <option value="Critical Stock">Critical Stock (Priority 10)</option>
+                  <option value="Low Stock">Low Stock (Priority 8)</option>
+                  <option value="Inspection Needed">Inspection Needed (Priority 6)</option>
+                  <option value="Normal">Normal (Priority 5)</option>
+                  <option value="Reorder Scheduled">Reorder Scheduled (Priority 3)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Priority (1 to 10)</label>
+                <input type="number" id="alertPriority" class="form-control" min="1" max="10" value="8" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Current Quantity</label>
+                <input type="number" id="alertQty" class="form-control" min="0" value="2" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Location</label>
+              <input type="text" id="alertLoc" class="form-control" placeholder="Rack B" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Insert into Heap (Heapify-Up)</button>
+          </form>
+        </div>
+
+        <!-- Heap Array Structure -->
+        <div class="card">
+          <div class="card-title">
+            <span>Heap Array Layout</span>
+            <span class="badge">Size: <span id="heapSizeCount">0</span></span>
+          </div>
+          <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Binary tree array indexing: Parent(i) = (i-1)//2 | Left = 2i+1 | Right = 2i+2
+          </p>
+          <div id="heapArrayVisual" class="log-box" style="max-height: 200px;"></div>
+        </div>
+      </div>
+
+      <!-- Alerts Table -->
+      <div class="card">
+        <div class="card-title">Active Warehouse Alerts in Heap</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Heap Index</th>
+                <th>Priority</th>
+                <th>Alert Type</th>
+                <th>SKU</th>
+                <th>Quantity</th>
+                <th>Location</th>
+              </tr>
+            </thead>
+            <tbody id="alertsTableBody">
+              <tr><td colspan="6">Loading alerts...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 4: WAREHOUSE GRAPH -->
+    <!-- ============================================================== -->
+    <section id="section-graph" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Warehouse Graph Network</h2>
+        <p class="page-subtitle">Dual representation of warehouse navigation network: Adjacency List and Adjacency Matrix.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Data Structure)</span>
+          <span class="viva-val">Adjacency List &amp; Adjacency Matrix</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Represents physical layout (aisles, racks, bays). Adjacency List is memory-efficient; Adjacency Matrix enables O(1) edge lookup for Floyd-Warshall.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Vertices 0..6 (Receiving, Racks A..D, Packing, Dispatch) &amp; Movement Costs</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Linked neighbor map or V &times; V 2D cost grid</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">List Space: O(V + E)</span> <span class="complexity-pill">Matrix Space: O(V²)</span></span>
+        </div>
+      </div>
+
+      <!-- Graph Canvas -->
+      <div class="canvas-card">
+        <div class="canvas-toolbar">
+          <div class="canvas-legend">
+            <span><span class="legend-dot" style="background:#0f172a;"></span> Location Node (V)</span>
+            <span><span class="legend-dot" style="background:#cbd5e1;"></span> Aisle / Route (E)</span>
+            <span><span class="legend-dot" style="background:#16a34a;"></span> Dijkstra Shortest Path</span>
+            <span><span class="legend-dot" style="background:#d97706;"></span> Prim MST Edge</span>
+          </div>
+          <div>
+            <button class="btn btn-sm" onclick="App.resetGraphToDefault()">Reset to Default Layout</button>
+          </div>
+        </div>
+        <canvas id="warehouseCanvas" width="900" height="400"></canvas>
+      </div>
+
+      <!-- Graph Representations Toggle -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>Graph Data Structure Representation</span>
+          <div>
+            <button class="btn btn-sm" id="btnShowAdjList" onclick="App.toggleGraphRepresentation('list')">Adjacency List (O(V+E))</button>
+            <button class="btn btn-sm" id="btnShowAdjMatrix" onclick="App.toggleGraphRepresentation('matrix')">Adjacency Matrix (O(V²))</button>
+          </div>
+        </div>
+
+        <div id="graphRepListContainer">
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Adjacency List stores each vertex and its incident edges. Space: O(V + E).
+          </p>
+          <div id="adjListDisplay" class="log-box" style="max-height: 300px;"></div>
+        </div>
+
+        <div id="graphRepMatrixContainer" style="display: none;">
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+            Adjacency Matrix stores edge costs between all vertex pairs. Space: O(V²).
+          </p>
+          <div class="table-container">
+            <table id="adjMatrixTable"></table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Custom Edge Form -->
+      <div class="card">
+        <div class="card-title">Add Custom Warehouse Route / Edge</div>
+        <form id="formAddEdge" onsubmit="App.handleAddEdge(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Source Node</label>
+              <select id="edgeSourceSelect" class="form-control" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Destination Node</label>
+              <select id="edgeDestSelect" class="form-control" required></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Distance / Movement Cost</label>
+              <input type="number" id="edgeWeightInput" class="form-control" min="1" step="0.5" value="5" required>
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Edge to Warehouse Graph</button>
+        </form>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 5: DIJKSTRA ROUTING -->
+    <!-- ============================================================== -->
+    <section id="section-dijkstra" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Shortest Path Routing – Dijkstra's Algorithm</h2>
+        <p class="page-subtitle">Calculate the lowest movement cost path between two warehouse locations.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">Dijkstra's Shortest Path (Custom Min-Heap)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Directs pickers or Automated Guided Vehicles (AGVs) along the fastest route to save battery and picking cycle time.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Source Location ID, Destination Location ID, Non-negative Graph Weights</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Shortest Distance Cost, Exact Route Sequence, Relaxation Step Log</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">Time: O((V + E) log V)</span> <span class="complexity-pill">Space: O(V)</span></span>
+        </div>
+      </div>
+
+      <!-- Route Selection Form -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">Select Route Endpoints</div>
+        <form id="formDijkstra" onsubmit="App.handleRunDijkstra(event)">
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">Source Location</label>
+              <select id="dijkstraSource" class="form-control"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Destination Location</label>
+              <select id="dijkstraDest" class="form-control"></select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end;">
+              <button type="submit" class="btn btn-primary" style="width: 100%; height: 35px;">Find Shortest Route</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Route Results -->
+      <div id="dijkstraResultsArea" style="display: none; margin-bottom: 1.5rem;">
+        <div class="card" style="border-left: 4px solid var(--success); margin-bottom: 1.25rem;">
+          <div class="card-title">
+            <span>Optimal Route Found</span>
+            <span class="badge badge-success" id="dijkstraCostBadge">Cost: 18</span>
+          </div>
+          <div style="font-size: 1.1rem; font-weight: 600; color: var(--text-primary); margin-bottom: 0.5rem;" id="dijkstraPathDesc">
+            Receiving &rarr; Rack B &rarr; Rack C &rarr; Packing Zone &rarr; Dispatch Bay
+          </div>
+          <div style="font-size: 0.8rem; color: var(--text-secondary);">
+            Visited order: <span id="dijkstraVisitedSeq"></span>
+          </div>
+        </div>
+
+        <!-- Step by Step Relaxation Table -->
+        <div class="card">
+          <div class="card-title">Step-by-Step Priority Queue &amp; Edge Relaxation Log</div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>Algorithm Action / Relaxation Details</th>
+                </tr>
+              </thead>
+              <tbody id="dijkstraStepsBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 6: PRIM MST -->
+    <!-- ============================================================== -->
+    <section id="section-prim" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Warehouse Network Optimization – Prim's MST</h2>
+        <p class="page-subtitle">Connect all warehouse locations with minimum total cable, conveyor, or track cost without cycles.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">Prim's Minimum Spanning Tree (Custom Min-Heap)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Designs backbone infrastructure (conveyor belts, pneumatic tubes, Ethernet wiring) connecting all zones at minimal installation cost.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Connected Weighted Graph &amp; Optional Starting Node</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">V-1 Selected MST Edges, Total MST Network Cost</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">Time: O((V + E) log V)</span> <span class="complexity-pill">Space: O(V + E)</span></span>
+        </div>
+      </div>
+
+      <!-- Important Viva Distinction Note -->
+      <div class="card" style="background-color: #fffbeb; border-color: #fde68a; margin-bottom: 1.5rem;">
+        <div style="font-size: 0.85rem; color: #92400e;">
+          <strong>Important Viva Distinction (Prim vs Dijkstra):</strong><br>
+          &bull; <strong>Dijkstra</strong> finds the shortest distance from <em>one source</em> to a destination.<br>
+          &bull; <strong>Prim</strong> builds a spanning tree connecting <em>all V vertices</em> with minimum <em>total edge weight sum</em>.
+        </div>
+      </div>
+
+      <!-- Prim Action Controls -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">Generate Warehouse Backbone Network</div>
+        <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+          <div class="form-group" style="margin-bottom: 0; min-width: 220px;">
+            <label class="form-label">Root / Start Vertex</label>
+            <select id="primStartNode" class="form-control"></select>
+          </div>
+          <button class="btn btn-primary" onclick="App.handleRunPrim()">Generate MST</button>
+        </div>
+      </div>
+
+      <!-- Prim Results Area -->
+      <div id="primResultsArea" style="display: none; margin-bottom: 1.5rem;">
+        <div class="card" style="border-left: 4px solid var(--warning); margin-bottom: 1.25rem;">
+          <div class="card-title">
+            <span>MST Construction Summary</span>
+            <span class="badge badge-warning" id="primTotalCostBadge">Total Cost: 21</span>
+          </div>
+          <p style="font-size: 0.875rem; color: var(--text-secondary);">
+            Selected <strong id="primEdgeCount">6</strong> edges connecting all <span id="primVertexCount">7</span> warehouse locations without forming cycles.
+          </p>
+        </div>
+
+        <div class="card-grid">
+          <!-- Selected Edges Table -->
+          <div class="card">
+            <div class="card-title">Selected MST Edges</div>
+            <div class="table-container">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Edge</th>
+                    <th>Weight</th>
+                  </tr>
+                </thead>
+                <tbody id="primEdgesBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Prim Step-by-Step Selection Log -->
+          <div class="card">
+            <div class="card-title">Step-by-Step Minimum Cut Selection</div>
+            <div id="primStepsLog" class="log-box" style="max-height: 250px;"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 7: FLOYD-WARSHALL ALL-PAIRS -->
+    <!-- ============================================================== -->
+    <section id="section-floyd" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">All-Pairs Shortest Paths – Floyd-Warshall</h2>
+        <p class="page-subtitle">Dynamic Programming matrix algorithm computing shortest movement distances between all location pairs.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">Floyd-Warshall Dynamic Programming</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Pre-computes an all-pairs distance lookup matrix, allowing O(1) query time when planning multiple batch picking orders.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Initial V &times; V Adjacency Matrix D<sup>(0)</sup></span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Final All-Pairs Shortest Distance Matrix D<sup>(V)</sup> &amp; Predecessor Paths</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">Time: O(V³)</span> <span class="complexity-pill">Space: O(V²)</span></span>
+        </div>
+      </div>
+
+      <!-- Run Button and Query Pair Controls -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">Execute Floyd-Warshall DP</div>
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+          <button class="btn btn-primary" onclick="App.handleRunFloydWarshall()">Run Floyd-Warshall (O(V³))</button>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <label class="form-label" style="margin-bottom: 0;">Query Pair:</label>
+            <select id="fwQuerySource" class="form-control" style="width: 140px;"></select>
+            <span>&rarr;</span>
+            <select id="fwQueryDest" class="form-control" style="width: 140px;"></select>
+            <button class="btn" onclick="App.handleQueryFwPair()">Lookup Distance</button>
+          </div>
+        </div>
+        <div id="fwQueryResult" style="margin-top: 0.75rem; font-size: 0.85rem; font-weight: 600; color: var(--accent);"></div>
+      </div>
+
+      <!-- Matrices: Initial vs Final -->
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-title">Initial Matrix D<sup>(0)</sup> (From Adjacency Matrix)</div>
+          <div class="table-container">
+            <table id="fwInitialMatrixTable"></table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Final Shortest Distance Matrix D<sup>(V)</sup></div>
+          <div class="table-container">
+            <table id="fwFinalMatrixTable"></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 8: 0/1 KNAPSACK DISPATCH -->
+    <!-- ============================================================== -->
+    <section id="section-knapsack" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Dispatch Picking Optimization – 0/1 Knapsack</h2>
+        <p class="page-subtitle">Dynamic Programming to maximize priority value of picked cargo under weight constraints.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">0/1 Knapsack (Dynamic Programming)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Picker trolleys or dispatch vans have strict maximum weight limits. Finds the optimal package bundle to fulfill high-priority orders.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Items (Weight w<sub>i</sub>, Priority Value v<sub>i</sub>) &amp; Max Capacity W</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">2D DP Table dp[i][w], Max Priority Sum, Backtracked Selected Items</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val"><span class="complexity-pill">Time: O(n &middot; W)</span> <span class="complexity-pill">Space: O(n &middot; W)</span></span>
+        </div>
+      </div>
+
+      <!-- Items Table & Cart Capacity Form -->
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-title">
+            <span>Available Warehouse Items</span>
+            <button class="btn btn-sm" onclick="App.resetKnapsackItems()">Reset Default Items</button>
+          </div>
+          <div class="table-container" style="margin-bottom: 0.75rem;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Item Name</th>
+                  <th>Weight (kg)</th>
+                  <th>Priority Value</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="knapsackItemsBody"></tbody>
+            </table>
+          </div>
+
+          <!-- Add Item Form -->
+          <form id="formAddKnapsackItem" onsubmit="App.handleAddKnapsackItem(event)" style="border-top: 1px solid var(--border-light); padding-top: 0.75rem;">
+            <div class="form-row">
+              <div class="form-group">
+                <input type="text" id="ksItemName" class="form-control" placeholder="Item Name" required>
+              </div>
+              <div class="form-group">
+                <input type="number" id="ksItemWeight" class="form-control" placeholder="Weight" min="1" value="3" required>
+              </div>
+              <div class="form-group">
+                <input type="number" id="ksItemValue" class="form-control" placeholder="Value" min="1" value="8" required>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-sm">Add Item to Pool</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Trolley / Dispatch Van Capacity</div>
+          <div class="form-group">
+            <label class="form-label">Max Capacity Limit (W in kg)</label>
+            <input type="number" id="ksCapacityInput" class="form-control" min="0" value="10" required>
+          </div>
+          <button class="btn btn-primary" style="width: 100%; margin-bottom: 1rem;" onclick="App.handleRunKnapsack()">
+            Solve 0/1 Knapsack (Generate DP Table)
+          </button>
+
+          <!-- Optimal Pick Summary -->
+          <div id="knapsackSummaryCard" style="display: none; padding: 0.75rem; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px;">
+            <div style="font-weight: 700; color: #166534; font-size: 0.9rem;">
+              Maximum Priority Achieved: <span id="ksMaxValue">23</span>
+            </div>
+            <div style="font-size: 0.8rem; color: #166534; margin-top: 0.2rem;">
+              Total Weight: <span id="ksTotalWeight">10</span> / <span id="ksCapacityDisplay">10</span> kg
+            </div>
+            <div style="margin-top: 0.5rem; font-size: 0.8rem;">
+              <strong>Selected Items:</strong>
+              <ul id="ksSelectedList" style="margin-left: 1.25rem; margin-top: 0.25rem;"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Complete 2D DP Table -->
+      <div class="card" id="knapsackDpTableCard" style="display: none; margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>Complete 2D DP Table [Rows: Items (0..n) &times; Cols: Capacities (0..W)]</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">dp[i][w] = max(dp[i-1][w], dp[i-1][w-wt]+val)</span>
+        </div>
+        <div class="table-container" style="max-height: 350px;">
+          <table id="knapsackDpTable"></table>
+        </div>
+      </div>
+
+      <!-- Decision Steps Log -->
+      <div class="card" id="knapsackStepsCard" style="display: none;">
+        <div class="card-title">Backtracking Decision Steps (0/1 Item Inclusion)</div>
+        <div id="knapsackDecisionSteps" class="log-box" style="max-height: 200px;"></div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 9: ALGORITHM COMPLEXITY & VIVA REFERENCE -->
+    <!-- ============================================================== -->
+    <section id="section-complexity" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Algorithm Complexity &amp; Academic Scope</h2>
+        <p class="page-subtitle">Comparative complexity analysis of implemented data structures and syllabus design rationale.</p>
+      </div>
+
+      <!-- Master Complexity Table -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">Implemented Algorithms Complexity Matrix</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Data Structure / Algorithm</th>
+                <th>Operation / Application</th>
+                <th>Time Complexity</th>
+                <th>Space Complexity</th>
+                <th>Warehouse Operational Role</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>AVL Tree</strong></td>
+                <td>SKU Search</td>
+                <td><span class="complexity-pill">O(log n)</span></td>
+                <td>O(n)</td>
+                <td>Instant barcode search for order picking</td>
+              </tr>
+              <tr>
+                <td><strong>AVL Tree</strong></td>
+                <td>SKU Insert</td>
+                <td><span class="complexity-pill">O(log n)</span></td>
+                <td>O(n)</td>
+                <td>Inventory stock intake with auto-rebalancing</td>
+              </tr>
+              <tr>
+                <td><strong>AVL Tree</strong></td>
+                <td>SKU Delete</td>
+                <td><span class="complexity-pill">O(log n)</span></td>
+                <td>O(n)</td>
+                <td>Depleted inventory SKU removal</td>
+              </tr>
+              <tr>
+                <td><strong>Binary Max Heap</strong></td>
+                <td>Alert Peek</td>
+                <td><span class="complexity-pill">O(1)</span></td>
+                <td>O(n)</td>
+                <td>Instant inspection of most critical warehouse issue</td>
+              </tr>
+              <tr>
+                <td><strong>Binary Max Heap</strong></td>
+                <td>Alert Insert / Extract</td>
+                <td><span class="complexity-pill">O(log n)</span></td>
+                <td>O(n)</td>
+                <td>Priority queueing of stockout &amp; maintenance alerts</td>
+              </tr>
+              <tr>
+                <td><strong>Adjacency List</strong></td>
+                <td>Warehouse Graph Representation</td>
+                <td>O(degree) traversal</td>
+                <td><span class="complexity-pill">O(V + E)</span></td>
+                <td>Sparse memory-efficient graph storage</td>
+              </tr>
+              <tr>
+                <td><strong>Adjacency Matrix</strong></td>
+                <td>Warehouse Graph Representation</td>
+                <td>O(1) edge lookup</td>
+                <td><span class="complexity-pill">O(V²)</span></td>
+                <td>Direct 2D matrix feed for Floyd-Warshall DP</td>
+              </tr>
+              <tr>
+                <td><strong>Dijkstra's Algorithm</strong></td>
+                <td>Single-Source Shortest Route</td>
+                <td><span class="complexity-pill">O((V + E) log V)</span></td>
+                <td>O(V)</td>
+                <td>Optimal picker/AGV routing from bay to destination</td>
+              </tr>
+              <tr>
+                <td><strong>Prim's Algorithm</strong></td>
+                <td>Minimum Spanning Tree (MST)</td>
+                <td><span class="complexity-pill">O((V + E) log V)</span></td>
+                <td>O(V + E)</td>
+                <td>Minimum-cost infrastructure / conveyor backbone design</td>
+              </tr>
+              <tr>
+                <td><strong>Floyd-Warshall</strong></td>
+                <td>All-Pairs Shortest Paths</td>
+                <td><span class="complexity-pill">O(V³)</span></td>
+                <td><span class="complexity-pill">O(V²)</span></td>
+                <td>Pre-computed distance matrix for batch logistics</td>
+              </tr>
+              <tr>
+                <td><strong>0/1 Knapsack</strong></td>
+                <td>Dispatch Cargo Optimization</td>
+                <td><span class="complexity-pill">O(n &middot; W)</span></td>
+                <td><span class="complexity-pill">O(n &middot; W)</span></td>
+                <td>Optimal high-priority item packing into weight-limited carts</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Scope Rationale Box -->
+      <div class="card">
+        <div class="card-title">Academic Scope &amp; Non-Implemented Syllabus Algorithms Rationale</div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.85rem;">
+          The following algorithms are part of the standard DSA-II syllabus but were intentionally excluded from the implemented warehouse platform:
+        </p>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Syllabus Algorithm</th>
+                <th>Why Excluded from Active Warehouse Workflow</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Kruskal's Algorithm</strong></td>
+                <td>Both Prim and Kruskal compute the MST. Prim was chosen because warehouse networks are localized and dense with a known starting node (Receiving Bay).</td>
+              </tr>
+              <tr>
+                <td><strong>Bellman-Ford Algorithm</strong></td>
+                <td>Warehouse travel times and physical distances are strictly non-negative. Dijkstra with a Min-Heap solves shortest paths faster (O((V+E)log V) vs O(V&middot;E)).</td>
+              </tr>
+              <tr>
+                <td><strong>Warshall's Transitive Closure</strong></td>
+                <td>Transitive closure determines mere boolean reachability. In physical warehouses, quantitative movement cost (Floyd-Warshall) is required.</td>
+              </tr>
+              <tr>
+                <td><strong>Longest Common Subsequence (LCS)</strong></td>
+                <td>LCS is tailored to string/genomic sequence comparisons and has no direct mapping to physical warehouse routing or storage constraints.</td>
+              </tr>
+              <tr>
+                <td><strong>Matrix Chain Multiplication (MCM)</strong></td>
+                <td>MCM optimizes associative matrix multiplication parenthesization, which does not govern physical material movement or inventory.</td>
+              </tr>
+              <tr>
+                <td><strong>Resource Allocation</strong></td>
+                <td>0/1 Knapsack directly models weight-limited cart picking, providing a clearer dynamic programming demonstration for warehouse dispatch.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- SCRIPTS -->
+  <script src="/static/js/api.js"></script>
+  <script src="/static/js/graph_canvas.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
