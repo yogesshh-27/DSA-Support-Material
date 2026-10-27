@@ -59,3 +59,24 @@ class GraphVertexSchema(BaseModel):
     name: str = Field(..., description="Location name")
     x: Optional[int] = Field(0, description="Visualization X coordinate")
     y: Optional[int] = Field(0, description="Visualization Y coordinate")
+
+
+class TSPRequest(BaseModel):
+    start_location_id: int = Field(0, ge=0, description="Starting warehouse zone ID for TSP tour")
+    selected_location_ids: List[int] = Field(..., min_length=1, description="List of location IDs to visit")
+
+
+class BPlusProductSchema(BaseModel):
+    product_id: str = Field(..., min_length=1, description="Unique Product ID, e.g. PRD101")
+    name: str = Field(..., min_length=1, description="Product Name")
+    category: str = Field(..., min_length=1, description="Product Category")
+    quantity: int = Field(..., ge=0, description="In-stock Quantity")
+    location: str = Field(..., min_length=1, description="Storage Location, e.g. Rack A")
+    priority: int = Field(..., ge=1, le=10, description="Handling priority (1 to 10)")
+    unit_weight: float = Field(..., gt=0.0, description="Unit Weight in kilograms")
+
+
+class BPlusRangeRequest(BaseModel):
+    min_product_id: str = Field(..., description="Start of Product ID range")
+    max_product_id: str = Field(..., description="End of Product ID range")
+

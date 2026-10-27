@@ -40,10 +40,17 @@
       <a class="nav-link" data-section="knapsack">
         <span>08</span> 0/1 Knapsack Dispatch
       </a>
+      <a class="nav-link" data-section="tsp">
+        <span>09</span> Route Optimizer (TSP)
+      </a>
+      <a class="nav-link" data-section="bplus">
+        <span>10</span> Advanced Search (B+ Tree)
+      </a>
       <a class="nav-link" data-section="complexity">
-        <span>09</span> Algorithm Complexity
+        <span>11</span> Algorithm Complexity
       </a>
     </nav>
+
 
     <div class="sidebar-footer">
       <div>BTech CSE – DSA-II PBL</div>
@@ -96,6 +103,16 @@
           <div class="stat-number" id="dashKnapsackCapacity">10 kg</div>
           <div class="stat-desc">0/1 Knapsack batch limit</div>
         </div>
+        <div class="stat-widget">
+          <div class="stat-title">B+ Tree Index (Unit 5)</div>
+          <div class="stat-number" id="dashBPlusCount">-</div>
+          <div class="stat-desc">Linked leaf inventory products</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">B+ Tree Height</div>
+          <div class="stat-number" id="dashBPlusHeight">-</div>
+          <div class="stat-desc">Multi-way balanced levels</div>
+        </div>
       </div>
 
       <!-- Quick Actions Card -->
@@ -107,8 +124,11 @@
           <button class="btn btn-primary" onclick="App.navigateTo('prim')">Generate MST (Prim)</button>
           <button class="btn btn-primary" onclick="App.navigateTo('floyd')">All-Pairs Distance (Floyd-Warshall)</button>
           <button class="btn btn-primary" onclick="App.navigateTo('knapsack')">Pack Dispatch Cart (0/1 Knapsack)</button>
+          <button class="btn btn-primary" style="background-color: #7c3aed; border-color: #6d28d9;" onclick="App.navigateTo('tsp')">Route Optimizer (TSP B&B)</button>
+          <button class="btn btn-primary" style="background-color: #059669; border-color: #047857;" onclick="App.navigateTo('bplus')">Advanced Search (B+ Tree)</button>
         </div>
       </div>
+
 
       <!-- Highest Priority Alert Banner -->
       <div class="card">
@@ -858,11 +878,484 @@
 
 
     <!-- ============================================================== -->
-    <!-- SECTION 9: ALGORITHM COMPLEXITY & VIVA REFERENCE -->
+    <!-- SECTION 9: WAREHOUSE ROUTE OPTIMIZER (TSP BRANCH & BOUND)      -->
+    <!-- ============================================================== -->
+    <section id="section-tsp" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Warehouse Route Optimizer – Travelling Salesman Problem</h2>
+        <p class="page-subtitle">Unit 4: Branch and Bound algorithm to compute an optimal minimum-cost tour visiting all selected warehouse zones exactly once and returning to start.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Algorithm)</span>
+          <span class="viva-val">Branch and Bound for TSP (Matrix Reduction Bounding Function)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Minimizes picker travel distance across multiple picking zones in a single round-trip order batch.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Start Zone ID, Multi-Selected Warehouse Zones, Actual Edge Weights Matrix</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Optimal Tour Sequence, Minimum Cost, Lower Bounds, Explored Nodes, Pruned Branches</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val">Time: O(2ⁿ &middot; n²) worst-case &bull; Space: O(n² &middot; 2ⁿ) &bull; Pruned subtrees eliminate huge candidate spaces</span>
+        </div>
+      </div>
+
+      <!-- Route Selection Controls Card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">1. Tour Configuration &amp; Warehouse Location Selector</div>
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 1.5rem; align-items: start;">
+          <div>
+            <label class="form-label" for="tspStartLocation">Starting Warehouse Location (Origin &amp; Depot Return)</label>
+            <select id="tspStartLocation" class="form-control" onchange="App.handleTspStartChange()">
+              <option value="0">0: Receiving</option>
+              <option value="1">1: Rack A</option>
+              <option value="2">2: Rack B</option>
+              <option value="3">3: Rack C</option>
+              <option value="4">4: Rack D</option>
+              <option value="5">5: Packing Zone</option>
+              <option value="6">6: Dispatch Bay</option>
+            </select>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.35rem;">
+              The tour begins here and must return here after visiting all selected zones.
+            </div>
+
+            <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+              <button class="btn btn-outline btn-sm" onclick="App.selectAllTspLocations()">Select All</button>
+              <button class="btn btn-outline btn-sm" onclick="App.selectSampleTspCycle()">Sample 4-Zone Cycle</button>
+              <button class="btn btn-outline btn-sm" onclick="App.clearTspLocations()">Clear Selection</button>
+            </div>
+          </div>
+
+          <div>
+            <label class="form-label">Multi-Select Warehouse Locations to Visit</label>
+            <div id="tspLocationCheckboxGrid" class="location-checkbox-grid">
+              <!-- Populated dynamically by App.initTspLocations() -->
+            </div>
+            <div style="display: flex; gap: 0.75rem; margin-top: 1rem;">
+              <button id="btnTspSolve" class="btn btn-primary" onclick="App.handleRunTsp()">Optimise Route</button>
+              <button id="btnTspReset" class="btn btn-outline" onclick="App.resetTsp()">Reset</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warehouse Network Visualizer for Tour -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>2. Warehouse Network Graph &amp; Tour Route Visualization</span>
+          <span style="font-size: 0.75rem; color: #7c3aed; font-weight: 600;">Purple lines: Active / Optimized TSP Tour</span>
+        </div>
+        <canvas id="tspWarehouseCanvas" class="network-canvas" style="height: 340px;"></canvas>
+      </div>
+
+      <!-- Step-by-Step State Space Tree Playback Controls -->
+      <div class="card" id="tspStepperCard" style="display: none; margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>3. Branch &amp; Bound State Space Tree Playback (Visual Execution Trace)</span>
+          <span id="tspStateBadge" class="state-badge start">START</span>
+        </div>
+
+        <div class="step-control-bar">
+          <button id="btnTspPrevStep" class="btn btn-outline btn-sm" onclick="App.tspPrevStep()">&#9664;&#9664; Prev Step</button>
+          <button id="btnTspPlayPause" class="btn btn-primary btn-sm" onclick="App.tspTogglePlay()">&#9654; Play</button>
+          <button id="btnTspNextStep" class="btn btn-outline btn-sm" onclick="App.tspNextStep()">Next Step &#9654;&#9654;</button>
+          <button class="btn btn-outline btn-sm" onclick="App.tspResetPlayback()">&#8634; Reset Trace</button>
+
+          <label style="font-size: 0.8rem; margin-left: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+            Speed:
+            <input type="range" id="tspPlaySpeed" min="200" max="2000" step="100" value="700" style="width: 90px;">
+          </label>
+
+          <div id="tspStepCounter" class="step-counter">Step 0 of 0</div>
+        </div>
+
+        <!-- Live Step State Widget -->
+        <div class="card-grid" style="margin-bottom: 0.75rem;">
+          <div class="stat-widget">
+            <div class="stat-title">Current Search Branch</div>
+            <div style="font-size: 0.95rem; font-weight: 700; color: #1e40af; margin-top: 0.35rem;" id="tspStepCurrentNode">-</div>
+            <div class="stat-desc">State Space Tree Node</div>
+          </div>
+          <div class="stat-widget">
+            <div class="stat-title">Accumulated Cost</div>
+            <div class="stat-number" style="font-size: 1.4rem;" id="tspStepAccumCost">-</div>
+            <div class="stat-desc">Direct corridors traversed</div>
+          </div>
+          <div class="stat-widget">
+            <div class="stat-title">Calculated Lower Bound</div>
+            <div class="stat-number" style="font-size: 1.4rem; color: #7c3aed;" id="tspStepLowerBound">-</div>
+            <div class="stat-desc">Matrix Reduction bounding</div>
+          </div>
+          <div class="stat-widget">
+            <div class="stat-title">Best Complete Tour</div>
+            <div class="stat-number" style="font-size: 1.4rem; color: #16a34a;" id="tspStepBestCost">-</div>
+            <div class="stat-desc">Current upper bound</div>
+          </div>
+        </div>
+
+        <!-- Step Explanation -->
+        <div id="tspStepReason" class="log-box" style="background-color: #ffffff; border-left: 4px solid #7c3aed; font-size: 0.85rem; padding: 0.75rem;">
+          Ready to execute Branch and Bound search trace.
+        </div>
+      </div>
+
+      <!-- Results Panel -->
+      <div class="card" id="tspResultsCard" style="display: none; margin-bottom: 1.5rem;">
+        <div class="card-title">4. Route Optimization Results &amp; Search Statistics</div>
+
+        <div id="tspTourImpossibleAlert" style="display: none; padding: 1rem; background-color: #fee2e2; border: 1px solid #ef4444; border-radius: 4px; color: #991b1b; margin-bottom: 1rem; font-size: 0.9rem;">
+          <strong>No Complete Tour Possible:</strong> The selected warehouse locations do not have direct corridor connections to form a closed Hamiltonian cycle.
+        </div>
+
+        <div id="tspTourSuccessContent">
+          <div class="card-grid" style="margin-bottom: 1rem;">
+            <div class="stat-widget">
+              <div class="stat-title">Total Route Cost</div>
+              <div class="stat-number" id="tspTotalCost">-</div>
+              <div class="stat-desc">Optimal round-trip distance</div>
+            </div>
+            <div class="stat-widget">
+              <div class="stat-title">Search Nodes Explored</div>
+              <div class="stat-number" id="tspNodesExplored">-</div>
+              <div class="stat-desc">State space nodes examined</div>
+            </div>
+            <div class="stat-widget">
+              <div class="stat-title">Branches Pruned</div>
+              <div class="stat-number" style="color: #dc2626;" id="tspBranchesPruned">-</div>
+              <div class="stat-desc">Subtrees eliminated by bound</div>
+            </div>
+            <div class="stat-widget">
+              <div class="stat-title">Pruning Efficiency</div>
+              <div class="stat-number" style="color: #16a34a;" id="tspPruningEfficiency">-</div>
+              <div class="stat-desc">Search space eliminated</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label class="form-label">Optimised Warehouse Visiting Sequence</label>
+            <div id="tspRouteChain" class="route-chain"></div>
+          </div>
+
+          <!-- Academic Comparison with Nearest Neighbor Heuristic -->
+          <div class="comparison-box">
+            <div style="font-weight: 700; font-size: 0.9rem; margin-bottom: 0.4rem; color: var(--text-primary);">
+              Academic Comparison: Optimal Branch &amp; Bound vs. Nearest-Neighbour Greedy Heuristic
+            </div>
+            <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+              The Nearest-Neighbor heuristic greedily chooses the closest unvisited location at each step. While fast, it can get trapped in high-cost returns or dead ends and does not guarantee an optimal answer.
+            </p>
+            <div id="tspHeuristicComparisonContent" style="font-size: 0.85rem;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Complexity Information Card -->
+      <div class="card">
+        <div class="card-title">5. Algorithmic Complexity &amp; Branch and Bound Principles</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">
+          <p style="margin-bottom: 0.5rem;">
+            <strong>NP-Hard Complexity:</strong> The Travelling Salesman Problem belongs to the class of NP-hard problems. The exhaustive search space of permutations for $n$ warehouse locations is $(n-1)! / 2$. Therefore, in the worst case, Branch and Bound remains an exponential-time algorithm ($\mathcal{O}(2^n \cdot n^2)$ or $\mathcal{O}(n!)$) and does NOT guarantee polynomial time.
+          </p>
+          <p style="margin-bottom: 0.5rem;">
+            <strong>Why Branch and Bound Avoids Exploring Subtrees:</strong> Branch and Bound computes a mathematical <em>Lower Bound ($LB$)</em> via Cost Matrix Reduction (row and column reduction). If a candidate partial branch has $LB \ge \text{Current Best Cost}$, that entire subtree is mathematically guaranteed to never produce a better tour. The algorithm immediately <em>prunes</em> that branch, skipping vast numbers of candidate routes.
+          </p>
+          <p>
+            <strong>Warehouse Relevance:</strong> Eliminating travel corridors saves battery life on Automated Guided Vehicles (AGVs) and reduces human picker walking fatigue during high-volume batch dispatching.
+          </p>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 10: ADVANCED INVENTORY SEARCH (B+ TREE)                 -->
+    <!-- ============================================================== -->
+    <section id="section-bplus" class="section-panel">
+      <div class="page-header">
+        <h2 class="page-title">Advanced Inventory Search – B+ Tree Index</h2>
+        <p class="page-subtitle">Unit 5: Self-balancing multi-way B+ Tree indexing warehouse products by Product ID with linked leaf nodes for ultra-fast sequential range retrieval.</p>
+      </div>
+
+      <!-- Viva Box -->
+      <div class="viva-box">
+        <div class="viva-item">
+          <span class="viva-label">What (Data Structure)</span>
+          <span class="viva-val">B+ Tree (Multi-Way Balanced Tree with Separator Keys &amp; Linked Leaves)</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Why (Warehouse Relevance)</span>
+          <span class="viva-val">Powers high-performance warehouse database indices; linked leaves allow instant range queries across SKU batches without tree recursion.</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Input</span>
+          <span class="viva-val">Product ID (Indexed Key), Name, Category, Quantity, Location, Priority, Unit Weight</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Output</span>
+          <span class="viva-val">Indexed Records, Search Routing Trace, Leaf Split Events, Range Query Results, Tree Hierarchy</span>
+        </div>
+        <div class="viva-item">
+          <span class="viva-label">Complexity</span>
+          <span class="viva-val">Search: O(log_M n) &bull; Insert: O(log_M n) &bull; Range Query: O(log_M n + K) &bull; Traversal: O(n) via linked leaves</span>
+        </div>
+      </div>
+
+      <!-- B+ Tree Statistics Widget -->
+      <div class="card-grid" style="margin-bottom: 1.5rem;">
+        <div class="stat-widget">
+          <div class="stat-title">Total Indexed Products</div>
+          <div class="stat-number" id="bplusTotalProducts">-</div>
+          <div class="stat-desc">Records in leaf nodes</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Current Tree Height</div>
+          <div class="stat-number" id="bplusTreeHeight">-</div>
+          <div class="stat-desc">Levels from root to leaf</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Leaf Nodes</div>
+          <div class="stat-number" style="color: #059669;" id="bplusLeafCount">-</div>
+          <div class="stat-desc">Linked data containers</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Internal Nodes</div>
+          <div class="stat-number" style="color: #2563eb;" id="bplusInternalCount">-</div>
+          <div class="stat-desc">Separator routing nodes</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Tree Order (M)</div>
+          <div class="stat-number" id="bplusTreeOrder">4</div>
+          <div class="stat-desc">Max 3 keys &bull; Max 4 children</div>
+        </div>
+        <div class="stat-widget">
+          <div class="stat-title">Last Search Comparisons</div>
+          <div class="stat-number" style="color: #d97706;" id="bplusComparisons">0</div>
+          <div class="stat-desc">Key comparisons evaluated</div>
+        </div>
+      </div>
+
+      <!-- Split Events Notification Banner -->
+      <div id="bplusSplitAlert" style="display: none; padding: 0.85rem 1rem; background-color: #ecfdf5; border: 1px solid #10b981; border-radius: 6px; margin-bottom: 1.5rem; font-size: 0.85rem; color: #065f46;">
+        <strong id="bplusSplitTitle">Node Split Event:</strong>
+        <span id="bplusSplitDesc">Node exceeded capacity; promoted separator key to parent.</span>
+      </div>
+
+      <!-- Two Column Operations: Insert & Point Search -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem;">
+
+        <!-- 1. Product Insertion Form -->
+        <div class="card">
+          <div class="card-title">1. Insert New Warehouse Product</div>
+          <form id="bplusInsertForm" onsubmit="App.handleAddBPlusProduct(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <div>
+                <label class="form-label" for="bpId">Product ID (Unique Key) *</label>
+                <input type="text" id="bpId" class="form-control" placeholder="e.g. PRD150" required>
+              </div>
+              <div>
+                <label class="form-label" for="bpName">Product Name *</label>
+                <input type="text" id="bpName" class="form-control" placeholder="e.g. Laser Sensor" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+              <div>
+                <label class="form-label" for="bpCategory">Category</label>
+                <input type="text" id="bpCategory" class="form-control" placeholder="e.g. Electronics" required>
+              </div>
+              <div>
+                <label class="form-label" for="bpQuantity">Quantity</label>
+                <input type="number" id="bpQuantity" class="form-control" min="0" value="25" required>
+              </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+              <div>
+                <label class="form-label" for="bpLocation">Location</label>
+                <select id="bpLocation" class="form-control">
+                  <option value="Receiving">Receiving</option>
+                  <option value="Rack A">Rack A</option>
+                  <option value="Rack B">Rack B</option>
+                  <option value="Rack C">Rack C</option>
+                  <option value="Rack D">Rack D</option>
+                  <option value="Packing Zone">Packing Zone</option>
+                  <option value="Dispatch Bay">Dispatch Bay</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" for="bpPriority">Priority (1-10)</label>
+                <input type="number" id="bpPriority" class="form-control" min="1" max="10" value="5" required>
+              </div>
+              <div>
+                <label class="form-label" for="bpWeight">Weight (kg)</label>
+                <input type="number" id="bpWeight" class="form-control" min="0.1" step="0.1" value="1.5" required>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+              <button type="submit" class="btn btn-primary">Insert into B+ Tree</button>
+              <button type="button" class="btn btn-outline" onclick="App.resetBPlusTree()">Reset Sample Data</button>
+            </div>
+          </form>
+        </div>
+
+        <!-- 2. Product Point Search -->
+        <div class="card">
+          <div class="card-title">2. Product ID Point Search &amp; Tree Routing</div>
+          <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+            <input type="text" id="bplusSearchId" class="form-control" placeholder="Enter Product ID (e.g. PRD101)">
+            <button class="btn btn-primary" onclick="App.handleSearchBPlus()">Search</button>
+          </div>
+
+          <!-- Point Search Result View -->
+          <div id="bplusSearchResultCard" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong>Search Result:</strong>
+              <span id="bplusSearchStatusBadge" class="badge badge-success">Found</span>
+            </div>
+            <div id="bplusSearchProductDetails" style="font-size: 0.85rem; line-height: 1.5; color: var(--text-secondary);"></div>
+
+            <!-- Path through internal nodes -->
+            <div style="margin-top: 0.75rem;">
+              <div style="font-weight: 700; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">
+                Search Path Traversed Across Nodes:
+              </div>
+              <div id="bplusSearchPathContainer" class="search-path-stepper"></div>
+            </div>
+          </div>
+          <div id="bplusSearchInitialHint" style="font-size: 0.85rem; color: var(--text-muted);">
+            Enter a Product ID above to observe how separator keys route the query through internal nodes directly to the destination leaf.
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Range Query Card -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>3. Range Search via Sequential Linked Leaf Nodes</span>
+          <span style="font-size: 0.75rem; color: #059669; font-weight: 600;">O(log_M n + K) &bull; Leaves linked via Next Pointers</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+          In a B+ Tree, range queries do NOT traverse the tree repeatedly. The tree is searched once to find the starting leaf, then the algorithm sequentially follows horizontal <code>next</code> pointers across adjacent leaf nodes.
+        </p>
+
+        <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1rem;">
+          <div>
+            <label class="form-label" for="bplusRangeMin">Min Product ID</label>
+            <input type="text" id="bplusRangeMin" class="form-control" value="PRD101" style="width: 140px;">
+          </div>
+          <div>
+            <label class="form-label" for="bplusRangeMax">Max Product ID</label>
+            <input type="text" id="bplusRangeMax" class="form-control" value="PRD130" style="width: 140px;">
+          </div>
+          <button class="btn btn-primary" onclick="App.handleRangeBPlus()">Execute Range Query</button>
+        </div>
+
+        <!-- Range Query Results Table -->
+        <div id="bplusRangeResultsContainer" style="display: none;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; font-size: 0.85rem;">
+            <div>
+              Matched: <strong id="bplusRangeCount">0</strong> products &bull;
+              Traversed Leaves: <strong id="bplusRangeLeavesCount">0</strong>
+            </div>
+            <div id="bplusRangeLeavesChain" style="font-family: var(--font-mono); color: #059669; font-size: 0.75rem;"></div>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product ID</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Quantity</th>
+                  <th>Location</th>
+                  <th>Priority</th>
+                  <th>Weight (kg)</th>
+                </tr>
+              </thead>
+              <tbody id="bplusRangeTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Interactive B+ Tree Visualisation Diagram -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">
+          <span>4. Live B+ Tree Data Structure Visualisation</span>
+          <span style="font-size: 0.75rem; color: var(--text-muted);">
+            Blue: Internal Nodes (Separators) &bull; Green: Leaf Nodes (Records) &bull; Dashed: Next Leaf Links
+          </span>
+        </div>
+        <div id="bplusTreeContainer" class="bplus-tree-wrapper">
+          <!-- Populated dynamically by App.renderBPlusTree() -->
+        </div>
+
+        <!-- Leaf Node Sequential Chain Bar -->
+        <div style="margin-top: 1rem;">
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.4rem;">
+            Sequential Linked Leaf Traversal Chain (O(n) Inorder Scan):
+          </div>
+          <div id="bplusLeafChainBar" class="bplus-leaf-chain-bar"></div>
+        </div>
+      </div>
+
+      <!-- 5. All Products in Sorted Order (Leaf Traversal Table) -->
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-title">5. All Indexed Warehouse Inventory (Sequential Leaf Scan)</div>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Product ID</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>Quantity Available</th>
+                <th>Storage Location</th>
+                <th>Priority</th>
+                <th>Unit Weight (kg)</th>
+              </tr>
+            </thead>
+            <tbody id="bplusProductsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 6. Academic Complexity & Viva Notes -->
+      <div class="card">
+        <div class="card-title">6. B+ Tree Complexity Analysis &amp; Academic Scope</div>
+        <div style="font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6;">
+          <p style="margin-bottom: 0.5rem;">
+            <strong>Why B+ Tree Instead of Standard BST or AVL Tree?</strong> In database indexing and storage management, records are stored in disk blocks. A B+ Tree maximizes node fanout ($M$), resulting in a shallow tree height ($\mathcal{O}(\log_M n)$ vs $\mathcal{O}(\log_2 n)$). Fewer tree levels mean drastically reduced disk page I/O operations.
+          </p>
+          <p style="margin-bottom: 0.5rem;">
+            <strong>Advantage of Linked Leaf Nodes:</strong> In standard B-Trees and BSTs, performing a range query or ordered traversal requires recursive in-order tree traversals with frequent upward and downward parent-child transitions. In a B+ Tree, all data records reside exclusively in leaf nodes linked via pointers, turning range queries into a single $\mathcal{O}(\log_M n)$ leaf search followed by an $\mathcal{O}(K)$ sequential linked list traversal!
+          </p>
+          <p>
+            <strong>Node Invariants:</strong> Every node contains between $\lceil M/2 \rceil - 1$ and $M - 1$ keys. All leaf nodes are guaranteed to reside at the exact same depth, providing deterministic search latencies.
+          </p>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ============================================================== -->
+    <!-- SECTION 11: ALGORITHM COMPLEXITY & VIVA REFERENCE              -->
     <!-- ============================================================== -->
     <section id="section-complexity" class="section-panel">
       <div class="page-header">
         <h2 class="page-title">Algorithm Complexity &amp; Academic Scope</h2>
+
         <p class="page-subtitle">Comparative complexity analysis of implemented data structures and syllabus design rationale.</p>
       </div>
 
@@ -958,10 +1451,39 @@
                 <td><span class="complexity-pill">O(n &middot; W)</span></td>
                 <td>Optimal high-priority item packing into weight-limited carts</td>
               </tr>
+              <tr>
+                <td><strong>TSP (Branch &amp; Bound)</strong></td>
+                <td>Warehouse Tour Optimization (Unit 4)</td>
+                <td><span class="complexity-pill">O(2ⁿ &middot; n²) / O(n!)</span></td>
+                <td>O(n² &middot; 2ⁿ)</td>
+                <td>Computes minimum-cost round-trip order picking tour across zones</td>
+              </tr>
+              <tr>
+                <td><strong>B+ Tree</strong></td>
+                <td>Product Point Search (Unit 5)</td>
+                <td><span class="complexity-pill">O(log_M n)</span></td>
+                <td>O(n)</td>
+                <td>Ultra-low I/O depth indexing for warehouse products by Product ID</td>
+              </tr>
+              <tr>
+                <td><strong>B+ Tree</strong></td>
+                <td>Product Insert (Unit 5)</td>
+                <td><span class="complexity-pill">O(log_M n)</span></td>
+                <td>O(n)</td>
+                <td>Auto-balancing with leaf separator copy-up and internal push-up</td>
+              </tr>
+              <tr>
+                <td><strong>B+ Tree</strong></td>
+                <td>Linked Leaf Range Query (Unit 5)</td>
+                <td><span class="complexity-pill">O(log_M n + K)</span></td>
+                <td>O(K)</td>
+                <td>Fast batch product range retrieval via sequential leaf pointers</td>
+              </tr>
             </tbody>
           </table>
         </div>
       </div>
+
 
       <!-- Scope Rationale Box -->
       <div class="card">

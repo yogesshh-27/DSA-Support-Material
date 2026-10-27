@@ -147,3 +147,84 @@ def test_api_knapsack():
     res = client.post("/knapsack", json=payload)
     assert res.status_code == 200
     assert res.json()["result"]["max_value"] == 23
+
+
+def test_api_tsp():
+    # 1. Locations
+    loc_res = client.get("/tsp/locations")
+    assert loc_res.status_code == 200
+    assert loc_res.json()["count"] >= 3
+
+    # 2. Solve TSP on Receiving(0), Rack A(1), Rack B(2)
+    # Direct edges: 0-1 (4), 0-2 (6), 1-2 (3) -> Tour cost = 13.0
+    payload = {
+        "start_location_id": 0,
+        "selected_location_ids": [0, 1, 2],
+    }
+    tsp_res = client.post("/tsp/solve", json=payload)
+    assert tsp_res.status_code == 200
+    data = tsp_res.json()
+    assert data["success"] is True
+    assert data["tour_possible"] is True
+    assert data["total_cost"] == 13.0
+    assert data["optimal_route_ids"][0] == 0
+    assert data["optimal_route_ids"][-1] == 0
+    assert len(data["execution_steps"]) > 0
+    assert data["nearest_neighbor"] is not None
+
+    # 3. Disconnected locations (impossible tour)
+    # Receiving(0), Packing Zone(5) without connecting edge
+    disc_payload = {
+        "start_location_id": 0,
+        "selected_location_ids": [0, 5],
+    }
+    disc_res = client.post("/tsp/solve", json=disc_payload)
+    assert disc_res.status_code == 200
+    assert disc_res.json()["tour_possible"] is False
+
+
+def test_api_bplus_tree():
+    # 1. Get products
+    prod_res = client.get("/bplus/products")
+    assert prod_res.status_code == 200
+    data = prod_res.json()
+    assert data["success"] is True
+    assert data["count"] >= 5
+    assert data["tree_stats"]["tree_height"] >= 1
+
+    # 2. Search existing
+    search_res = client.get("/bplus/search/PRD101")
+    assert search_res.status_code == 200
+    s_data = search_res.json()
+    assert s_data["found"] is True
+    assert s_data["product"]["product_id"] == "PRD101"
+
+    # 3. Search non-existent
+    search_fail = client.get("/bplus/search/NONEXISTENT999")
+    assert search_fail.status_code == 404
+
+    # 4. Insert new product
+    new_prod = {
+        "product_id": "PRD999",
+        "name": "Custom Heavy Duty Jack",
+        "category": "Machinery",
+        "quantity": 5,
+        "location": "Rack D",
+        "priority": 9,
+        "unit_weight": 22.5,
+    }
+    ins_res = client.post("/bplus/product", json=new_prod)
+    assert ins_res.status_code == 200
+    assert ins_res.json()["success"] is True
+
+    # Duplicate rejection
+    dup_res = client.post("/bplus/product", json=new_prod)
+    assert dup_res.status_code == 400
+
+    # 5. Range search
+    range_res = client.post("/bplus/range", json={"min_product_id": "PRD101", "max_product_id": "PRD120"})
+    assert range_res.status_code == 200
+    r_data = range_res.json()
+    assert r_data["success"] is True
+    assert r_data["count"] >= 1
+

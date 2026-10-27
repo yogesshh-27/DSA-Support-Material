@@ -20,6 +20,8 @@ from backend.dsa.dijkstra import dijkstra_shortest_path
 from backend.dsa.prim import prim_mst
 from backend.dsa.floyd_warshall import floyd_warshall_all_pairs, query_floyd_warshall_pair
 from backend.dsa.knapsack import solve_01_knapsack
+from backend.dsa.tsp_branch_bound import solve_tsp_branch_and_bound, solve_tsp_nearest_neighbor
+from backend.dsa.b_plus_tree import BPlusTree
 from backend.models.schemas import (
     InventoryItemSchema,
     AlertSchema,
@@ -29,6 +31,9 @@ from backend.models.schemas import (
     KnapsackRequest,
     GraphEdgeSchema,
     GraphVertexSchema,
+    TSPRequest,
+    BPlusProductSchema,
+    BPlusRangeRequest,
 )
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -54,18 +59,21 @@ app.add_middleware(
 avl_tree = AVLTree()
 alert_heap = MaxHeap()
 warehouse_graph = WarehouseGraph()
+bplus_tree = BPlusTree(order=4)
 latest_floyd_warshall: Dict[str, Any] = {}
 default_knapsack_data: Dict[str, Any] = {}
 
 
 def load_initial_datasets():
-    """Load default sample inventory and warehouse network data."""
-    global avl_tree, alert_heap, warehouse_graph, latest_floyd_warshall, default_knapsack_data
+    """Load default sample inventory, warehouse network, and B+ tree data."""
+    global avl_tree, alert_heap, warehouse_graph, bplus_tree, latest_floyd_warshall, default_knapsack_data
 
     # Reset
     avl_tree = AVLTree()
     alert_heap = MaxHeap()
     warehouse_graph = WarehouseGraph()
+    bplus_tree = BPlusTree(order=4)
+
 
     # Load inventory
     inv_file = DATA_DIR / "inventory.json"
@@ -115,9 +123,18 @@ def load_initial_datasets():
             # Pre-compute initial Floyd-Warshall cache
             latest_floyd_warshall = floyd_warshall_all_pairs(warehouse_graph)
 
+    # Load B+ Tree sample products
+    bplus_file = DATA_DIR / "bplus_products.json"
+    if bplus_file.exists():
+        with open(bplus_file, "r", encoding="utf-8") as f:
+            bplus_items = json.load(f)
+            for it in bplus_items:
+                bplus_tree.insert(it)
+
 
 # Initialize on module load
 load_initial_datasets()
+
 
 
 # =====================================================================
@@ -412,6 +429,7 @@ def run_knapsack(req: KnapsackRequest):
 @app.get("/dashboard/stats", summary="Overview metrics for Dashboard")
 def get_dashboard_stats():
     inventory_items = avl_tree.inorder_traversal()
+    internals, leaves = bplus_tree.count_nodes()
     return {
         "total_inventory_items": len(inventory_items),
         "total_stock_units": sum(it.get("quantity", 0) for it in inventory_items),
@@ -420,7 +438,177 @@ def get_dashboard_stats():
         "active_alerts_count": alert_heap.size(),
         "highest_priority_alert": alert_heap.peek(),
         "default_dispatch_capacity": default_knapsack_data.get("capacity", 10),
+        "total_bplus_products": bplus_tree.size,
+        "bplus_tree_height": bplus_tree.get_height(),
+        "bplus_leaf_count": leaves,
+        "bplus_internal_count": internals,
     }
+
+
+# =====================================================================
+# 9. WAREHOUSE ROUTE OPTIMIZER (TSP BRANCH AND BOUND) ENDPOINTS
+# =====================================================================
+
+@app.get("/tsp/locations", summary="Get all warehouse locations selectable for TSP tour")
+def get_tsp_locations():
+    return {
+        "success": True,
+        "locations": warehouse_graph.vertices,
+        "count": len(warehouse_graph.vertices),
+    }
+
+
+@app.post("/tsp/solve", summary="Solve TSP tour using Branch and Bound")
+def run_tsp(req: TSPRequest):
+    try:
+        adj = warehouse_graph.adj_matrix
+        n = len(warehouse_graph.vertices)
+
+        # Validate location IDs
+        for loc_id in req.selected_location_ids:
+            if loc_id < 0 or loc_id >= n:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid location ID {loc_id}")
+        if req.start_location_id not in req.selected_location_ids:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Start location must be among selected locations.")
+
+        # Build submatrix of direct edge weights for selected locations
+        k = len(req.selected_location_ids)
+        sub_matrix = [[float("inf")] * k for _ in range(k)]
+        for i, u in enumerate(req.selected_location_ids):
+            for j, v in enumerate(req.selected_location_ids):
+                if i == j:
+                    sub_matrix[i][j] = float("inf")
+                else:
+                    sub_matrix[i][j] = adj[u][v]
+
+        result = solve_tsp_branch_and_bound(
+            location_ids=req.selected_location_ids,
+            cost_matrix=sub_matrix,
+            id_to_name=warehouse_graph.id_to_name,
+            start_vertex_id=req.start_location_id,
+        )
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# =====================================================================
+# 10. ADVANCED INVENTORY SEARCH (B+ TREE) ENDPOINTS
+# =====================================================================
+
+@app.get("/bplus/products", summary="Get all inventory products in sorted order via linked leaves")
+def get_bplus_products():
+    records = bplus_tree.get_all_records_sorted()
+    internals, leaves = bplus_tree.count_nodes()
+    return {
+        "success": True,
+        "count": len(records),
+        "products": records,
+        "tree_stats": {
+            "total_products": bplus_tree.size,
+            "tree_height": bplus_tree.get_height(),
+            "internal_nodes_count": internals,
+            "leaf_nodes_count": leaves,
+            "order": bplus_tree.order,
+            "max_keys": bplus_tree.max_keys,
+            "min_keys": bplus_tree.min_keys,
+        },
+        "tree_hierarchy": bplus_tree.to_tree_hierarchy(),
+        "algorithm": "B+ Tree (Multi-Way Balanced Search Tree with Linked Leaves)",
+        "complexity": {
+            "search": f"O(log_{bplus_tree.order} n)",
+            "insert": f"O(log_{bplus_tree.order} n)",
+            "range_query": f"O(log_{bplus_tree.order} n + K)",
+            "traversal": "O(n) via sequential leaf pointers",
+        },
+    }
+
+
+@app.post("/bplus/product", summary="Insert new product into B+ Tree")
+def add_bplus_product(product: BPlusProductSchema):
+    prod_dict = product.model_dump()
+    success, message, split_events = bplus_tree.insert(prod_dict)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=message)
+    internals, leaves = bplus_tree.count_nodes()
+    return {
+        "success": True,
+        "message": message,
+        "product": prod_dict,
+        "split_events": split_events,
+        "tree_stats": {
+            "total_products": bplus_tree.size,
+            "tree_height": bplus_tree.get_height(),
+            "internal_nodes_count": internals,
+            "leaf_nodes_count": leaves,
+            "order": bplus_tree.order,
+        },
+        "tree_hierarchy": bplus_tree.to_tree_hierarchy(),
+    }
+
+
+@app.get("/bplus/search/{product_id}", summary="Search product by Product ID in B+ Tree")
+def search_bplus_product(product_id: str):
+    clean_id = product_id.strip().upper()
+    if not clean_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Product ID cannot be blank.")
+    record, found, path, comparisons = bplus_tree.search(clean_id)
+    if not found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Product ID '{clean_id}' not found in B+ Tree index. Comparisons: {comparisons}.",
+        )
+    return {
+        "success": True,
+        "found": True,
+        "product": record,
+        "comparisons": comparisons,
+        "search_path": path,
+        "algorithm": "B+ Tree Point Search",
+        "complexity": f"O(log_{bplus_tree.order} n)",
+    }
+
+
+@app.post("/bplus/range", summary="Range search between two Product IDs using linked leaves")
+def range_bplus_products(req: BPlusRangeRequest):
+    result = bplus_tree.range_query(req.min_product_id, req.max_product_id)
+    return result
+
+
+@app.get("/bplus/tree", summary="Get complete B+ Tree structural hierarchy for visualization")
+def get_bplus_tree():
+    return {
+        "success": True,
+        "tree": bplus_tree.to_tree_hierarchy(),
+    }
+
+
+@app.post("/bplus/reset", summary="Reset B+ Tree to default sample warehouse inventory")
+def reset_bplus_tree():
+    global bplus_tree
+    bplus_tree = BPlusTree(order=4)
+    bplus_file = DATA_DIR / "bplus_products.json"
+    if bplus_file.exists():
+        with open(bplus_file, "r", encoding="utf-8") as f:
+            bplus_items = json.load(f)
+            for it in bplus_items:
+                bplus_tree.insert(it)
+    internals, leaves = bplus_tree.count_nodes()
+    return {
+        "success": True,
+        "message": "B+ Tree index reset to default sample warehouse products.",
+        "tree_stats": {
+            "total_products": bplus_tree.size,
+            "tree_height": bplus_tree.get_height(),
+            "internal_nodes_count": internals,
+            "leaf_nodes_count": leaves,
+            "order": bplus_tree.order,
+        },
+        "tree_hierarchy": bplus_tree.to_tree_hierarchy(),
+    }
+
 
 
 # =====================================================================

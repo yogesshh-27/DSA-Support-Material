@@ -37,11 +37,14 @@ The platform follows a clean, modular 4-tier academic architecture:
   ├── Dijkstra's Algorithm (Single-Source Shortest Path)
   ├── Prim's Algorithm (Minimum Spanning Tree)
   ├── Floyd-Warshall Algorithm (All-Pairs Shortest Path DP)
-  └── 0/1 Knapsack Algorithm (Dispatch Optimization DP)
+  ├── 0/1 Knapsack Algorithm (Dispatch Optimization DP)
+  ├── TSP Branch and Bound (Warehouse Tour Optimization - Unit 4)
+  └── B+ Tree Multi-Way Search Tree (Advanced Inventory Index - Unit 5)
                    │
                    ▼
-[ Warehouse Datasets: inventory.json & warehouse.json ]
+[ Warehouse Datasets: inventory.json, bplus_products.json, & warehouse.json ]
 ```
+
 
 ---
 
@@ -124,9 +127,30 @@ Every module is designed around the **WHAT &bull; WHY &bull; INPUT &bull; OUTPUT
 * **WHY:** Picking carts or delivery dispatch vans have a strict maximum weight limit $W$. Selects the optimal combination of discrete packages to maximize overall priority fulfillment without exceeding cart capacity.
 * **INPUT:** Items pool (Weight $w_i$, Priority Value $v_i$) and maximum capacity $W$.
 * **OUTPUT:** Maximum achieved priority value, total weight, selected items list, complete 2D DP matrix ($0..n \times 0..W$), and backtracking decision trace.
+### 3.8 Warehouse Route Optimizer – Travelling Salesman Problem (Unit 4: Branch and Bound)
+* **WHAT:** Branch and Bound optimization using a Cost Matrix Reduction bounding function:
+  $$LB_{\text{child}} = LB_{\text{parent}} + \text{reduced\_cost}(u, v) + \sum r_i + \sum c_j$$
+* **WHY:** Determines the minimum-distance round-trip route visiting every selected warehouse picking zone exactly once and returning to the depot. Prunes candidate permutations whose mathematical lower bound cannot beat the best complete tour found so far.
+* **INPUT:** Origin zone ID, multi-selected warehouse picking locations, direct corridor distance weights.
+* **OUTPUT:** Optimal tour visiting sequence, total route travel cost, number of search nodes explored, number of pruned subtrees, pruning efficiency percentage, and comparison against a greedy Nearest-Neighbor heuristic.
 * **COMPLEXITY:**
-  * Time: $\mathcal{O}(n \cdot W)$
-  * Space: $\mathcal{O}(n \cdot W)$
+  * Time: $\mathcal{O}(2^n \cdot n^2)$ or $\mathcal{O}(n!)$ worst-case (NP-hard problem; pruning eliminates huge subtrees)
+  * Space: $\mathcal{O}(n^2 \cdot 2^n)$
+
+### 3.9 Advanced Inventory Index – B+ Tree (Unit 5: Advanced Data Structures)
+* **WHAT:** Self-balancing multi-way search tree of order $M=4$:
+  * Internal nodes contain separator keys and child pointers.
+  * Leaf nodes contain indexed inventory records and are linked sequentially via `next` pointers.
+  * Node splitting with separator copy-up (leaves) and key push-up (internal nodes) maintains balance.
+* **WHY:** Database-grade indexing for warehouse products by Product ID. Linked leaf nodes allow ultra-fast sequential range scans across SKU ranges without tree recursion.
+* **INPUT:** Product ID (`PRD101`, `PRD105`, etc.), Name, Category, Quantity, Location, Priority, Unit Weight.
+* **OUTPUT:** Point search with internal node routing trace, range search results table, live tree hierarchy visualization, and leaf-to-leaf sequential traversal.
+* **COMPLEXITY:**
+  * Point Search: $\mathcal{O}(\log_M n)$
+  * Insertion: $\mathcal{O}(\log_M n)$
+  * Range Query: $\mathcal{O}(\log_M n + K)$ where $K$ is the number of matching records
+  * Sorted Traversal: $\mathcal{O}(n)$ via sequential leaf pointers
+  * Space: $\mathcal{O}(n)$
 
 ---
 
@@ -145,6 +169,10 @@ Every module is designed around the **WHAT &bull; WHY &bull; INPUT &bull; OUTPUT
 | **Prim's Algorithm** | Minimum Spanning Tree | $\mathcal{O}((V + E) \log V)$ | $\mathcal{O}(V + E)$ |
 | **Floyd-Warshall** | All-Pairs Shortest Distances | $\mathcal{O}(V^3)$ | $\mathcal{O}(V^2)$ |
 | **0/1 Knapsack** | Dispatch Cargo Optimization | $\mathcal{O}(n \cdot W)$ | $\mathcal{O}(n \cdot W)$ |
+| **TSP (Branch & Bound)** | Route Tour Optimization (Unit 4) | $\mathcal{O}(2^n \cdot n^2)$ / $\mathcal{O}(n!)$ | $\mathcal{O}(n^2 \cdot 2^n)$ |
+| **B+ Tree** | Point Search / Insert (Unit 5) | $\mathcal{O}(\log_M n)$ | $\mathcal{O}(n)$ |
+| **B+ Tree** | Linked Leaf Range Query (Unit 5) | $\mathcal{O}(\log_M n + K)$ | $\mathcal{O}(K)$ |
+
 
 ---
 
@@ -181,12 +209,15 @@ DSA PBL/
 │   │   ├── dijkstra.py          # Custom Min-Heap Dijkstra algorithm
 │   │   ├── prim.py              # Custom Min-Heap Prim MST algorithm
 │   │   ├── floyd_warshall.py    # All-pairs DP with matrix reconstruction
-│   │   └── knapsack.py          # 0/1 Knapsack with 2D DP table & backtracking
+│   │   ├── knapsack.py          # 0/1 Knapsack with 2D DP table & backtracking
+│   │   ├── tsp_branch_bound.py  # Branch & Bound TSP with Matrix Reduction (Unit 4)
+│   │   └── b_plus_tree.py       # Multi-Way B+ Tree with linked leaves (Unit 5)
 │   └── data/
 │       ├── inventory.json       # Initial sample inventory (SKU001 - SKU005)
+│       ├── bplus_products.json  # Rich B+ Tree warehouse inventory records
 │       └── warehouse.json       # Standard warehouse graph (7 nodes, 11 edges)
 ├── frontend/
-│   ├── index.html               # Semantic academic UI with 9 sections
+│   ├── index.html               # Semantic academic UI with 11 sections
 │   ├── css/
 │   │   └── style.css            # Minimal academic stylesheet (light theme)
 │   └── js/
@@ -199,6 +230,8 @@ DSA PBL/
 │   ├── test_binary_heap.py      # Heap unit tests (insert, peek, extract)
 │   ├── test_graph_algorithms.py # Dijkstra, Prim, Floyd-Warshall, edge cases
 │   ├── test_knapsack.py         # Knapsack DP table, backtracking, edge cases
+│   ├── test_tsp.py              # Branch & Bound TSP, pruning, known tours, NN comparison
+│   ├── test_bplus_tree.py       # B+ Tree insert, splits, search, range query, linked leaves
 │   └── test_api.py              # FastAPI endpoints & static file serving tests
 ├── .gitignore
 ├── pytest.ini (optional)
@@ -240,7 +273,7 @@ http://127.0.0.1:8000/docs
 
 ## 8. Running Automated Unit Tests
 
-A comprehensive suite of **27 unit and integration tests** verifies every algorithm, rotation case, priority queue action, and edge condition:
+A comprehensive suite of **44 unit and integration tests** verifies every algorithm, rotation case, priority queue action, and edge condition:
 
 ```bash
 python -m pytest tests/ -v
@@ -251,6 +284,10 @@ python -m pytest tests/ -v
 - **Binary Heap:** Insertion, peek $\mathcal{O}(1)$, sequential extract-max priority order verification, empty heap handling.
 - **Graph & Routing:** Adjacency List and Matrix symmetry, negative weight rejection, Dijkstra shortest path ($18.0$), Prim MST ($21.0$, $6$ edges), Floyd-Warshall all-pairs distance matrix, disconnected graph handling, invalid vertex IDs.
 - **0/1 Knapsack:** Sample data optimal value ($23$), 2D DP table dimensions, zero-capacity edge case, empty item list, invalid negative weight validation.
+- **TSP Branch and Bound (Unit 4):** Single & two location edge cases, known optimal triangle & 4-city tours, branch pruning verification, disconnected graph & missing connection detection, Nearest-Neighbor heuristic comparison.
+- **B+ Tree (Unit 5):** Empty tree, sequential insertions, duplicate key rejection, leaf split, internal node split, root split (tree height growth), point search path, linked leaf sorted traversal, range queries, full hierarchy serialization.
+- **API Endpoints:** Complete HTTP CRUD cycle for inventory, alerts, graph calculations, TSP optimization, B+ Tree search/range/insert, and static asset serving.
+
 - **API Endpoints:** Complete HTTP CRUD cycle for inventory, alerts, graph calculations, and static asset serving.
 
 ---

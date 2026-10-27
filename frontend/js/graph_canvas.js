@@ -124,10 +124,14 @@ class GraphCanvasRenderer {
       const p2 = nodePosMap[edge.v];
       if (!p1 || !p2) return;
 
+      let strokeColor = "#16a34a";
+      if (this.highlightType === "prim") strokeColor = "#d97706";
+      else if (this.highlightType === "tsp") strokeColor = "#7c3aed";
+
       this.ctx.beginPath();
       this.ctx.moveTo(p1.x, p1.y);
       this.ctx.lineTo(p2.x, p2.y);
-      this.ctx.strokeStyle = this.highlightType === "dijkstra" ? "#16a34a" : "#d97706";
+      this.ctx.strokeStyle = strokeColor;
       this.ctx.lineWidth = 4;
       this.ctx.stroke();
 
@@ -145,8 +149,19 @@ class GraphCanvasRenderer {
       this.ctx.arc(pos.x, pos.y, 18, 0, 2 * Math.PI);
 
       if (isNodeHL) {
-        this.ctx.fillStyle = this.highlightType === "dijkstra" ? "#dcfce7" : "#fef3c7";
-        this.ctx.strokeStyle = this.highlightType === "dijkstra" ? "#16a34a" : "#d97706";
+        if (this.highlightType === "dijkstra") {
+          this.ctx.fillStyle = "#dcfce7";
+          this.ctx.strokeStyle = "#16a34a";
+        } else if (this.highlightType === "prim") {
+          this.ctx.fillStyle = "#fef3c7";
+          this.ctx.strokeStyle = "#d97706";
+        } else if (this.highlightType === "tsp") {
+          this.ctx.fillStyle = "#ede9fe";
+          this.ctx.strokeStyle = "#7c3aed";
+        } else {
+          this.ctx.fillStyle = "#e0e7ff";
+          this.ctx.strokeStyle = "#4338ca";
+        }
         this.ctx.lineWidth = 3;
       } else {
         this.ctx.fillStyle = "#ffffff";
@@ -155,6 +170,7 @@ class GraphCanvasRenderer {
       }
       this.ctx.fill();
       this.ctx.stroke();
+
 
       // Vertex ID text
       this.ctx.fillStyle = "#0f172a";

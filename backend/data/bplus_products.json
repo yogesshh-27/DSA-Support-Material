@@ -1,0 +1,92 @@
+[
+  {
+    "product_id": "PRD101",
+    "name": "Industrial Barcode Scanner",
+    "category": "Electronics",
+    "quantity": 35,
+    "location": "Receiving",
+    "priority": 8,
+    "unit_weight": 0.85
+  },
+  {
+    "product_id": "PRD105",
+    "name": "Hydraulic Pallet Jack Wheel",
+    "category": "Machinery",
+    "quantity": 14,
+    "location": "Rack A",
+    "priority": 7,
+    "unit_weight": 4.20
+  },
+  {
+    "product_id": "PRD110",
+    "name": "Wireless RFID Reader",
+    "category": "Electronics",
+    "quantity": 20,
+    "location": "Rack B",
+    "priority": 9,
+    "unit_weight": 1.10
+  },
+  {
+    "product_id": "PRD115",
+    "name": "Thermal Label Rolls (Box)",
+    "category": "Packaging",
+    "quantity": 180,
+    "location": "Packing Zone",
+    "priority": 5,
+    "unit_weight": 2.50
+  },
+  {
+    "product_id": "PRD120",
+    "name": "Heavy Duty Packaging Tape",
+    "category": "Packaging",
+    "quantity": 250,
+    "location": "Packing Zone",
+    "priority": 4,
+    "unit_weight": 0.45
+  },
+  {
+    "product_id": "PRD125",
+    "name": "Steel Toe Safety Boots (Size 10)",
+    "category": "Safety Gear",
+    "quantity": 40,
+    "location": "Rack C",
+    "priority": 6,
+    "unit_weight": 1.75
+  },
+  {
+    "product_id": "PRD130",
+    "name": "High-Visibility Vest (XL)",
+    "category": "Safety Gear",
+    "quantity": 95,
+    "location": "Receiving",
+    "priority": 3,
+    "unit_weight": 0.30
+  },
+  {
+    "product_id": "PRD135",
+    "name": "Stretch Wrap Roll (500m)",
+    "category": "Packaging",
+    "quantity": 60,
+    "location": "Dispatch Bay",
+    "priority": 6,
+    "unit_weight": 3.80
+  },
+  {
+    "product_id": "PRD140",
+    "name": "Digital Weighing Scale 50kg",
+    "category": "Instruments",
+    "quantity": 8,
+    "location": "Dispatch Bay",
+    "priority": 9,
+    "unit_weight": 5.50
+  },
+  {
+    "product_id": "PRD145",
+    "name": "Conveyor Belt Replacement Motor",
+    "category": "Machinery",
+    "quantity": 3,
+    "location": "Rack D",
+    "priority": 10,
+    "unit_weight": 12.00
+  }
+]

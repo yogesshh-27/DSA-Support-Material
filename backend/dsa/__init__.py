@@ -9,6 +9,12 @@ from backend.dsa.dijkstra import dijkstra_shortest_path, MinHeapPriorityQueue
 from backend.dsa.prim import prim_mst
 from backend.dsa.floyd_warshall import floyd_warshall_all_pairs, query_floyd_warshall_pair
 from backend.dsa.knapsack import solve_01_knapsack
+from backend.dsa.tsp_branch_bound import (
+    solve_tsp_branch_and_bound,
+    solve_tsp_nearest_neighbor,
+    TSPNode,
+)
+from backend.dsa.b_plus_tree import BPlusTree, BPlusNode
 
 __all__ = [
     "AVLTree",
@@ -22,4 +28,10 @@ __all__ = [
     "floyd_warshall_all_pairs",
     "query_floyd_warshall_pair",
     "solve_01_knapsack",
+    "solve_tsp_branch_and_bound",
+    "solve_tsp_nearest_neighbor",
+    "TSPNode",
+    "BPlusTree",
+    "BPlusNode",
 ]
+

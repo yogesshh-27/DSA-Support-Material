@@ -5,17 +5,30 @@
 
 const App = {
   graphRenderer: null,
+  tspRenderer: null,
   cachedGraph: null,
   knapsackItems: [],
+
+  // TSP State (Unit 4: Branch and Bound)
+  tspLocations: [],
+  tspSelectedSet: new Set([0, 1, 2, 3]),
+  tspExecutionSteps: [],
+  tspCurrentStepIdx: 0,
+  tspIsPlaying: false,
+  tspPlayTimer: null,
+  tspLastResult: null,
 
   init() {
     this.initNavigation();
     this.graphRenderer = new GraphCanvasRenderer("warehouseCanvas");
+    this.tspRenderer = new GraphCanvasRenderer("tspWarehouseCanvas");
     this.loadDashboardData();
     this.loadGraphData();
     this.loadInventoryData();
     this.loadAlertsData();
     this.initDefaultKnapsack();
+    this.initTspLocations();
+    this.loadBPlusData();
   },
 
   showFeedback(message, type = "success") {
@@ -59,9 +72,21 @@ const App = {
       }, 50);
     }
 
+    if (sectionId === "tsp") {
+      setTimeout(() => {
+        if (this.tspRenderer) {
+          this.tspRenderer.setupResize();
+          if (this.cachedGraph) {
+            this.tspRenderer.setData(this.cachedGraph.vertices, this.cachedGraph.edges);
+          }
+        }
+      }, 50);
+    }
+
     if (sectionId === "dashboard") this.loadDashboardData();
     if (sectionId === "inventory") this.loadInventoryData();
     if (sectionId === "alerts") this.loadAlertsData();
+    if (sectionId === "bplus") this.loadBPlusData();
   },
 
   // -------------------------------------------------------------
@@ -77,6 +102,13 @@ const App = {
       document.getElementById("dashAlertsCount").textContent = stats.active_alerts_count;
       document.getElementById("dashKnapsackCapacity").textContent = `${stats.default_dispatch_capacity} kg`;
 
+      if (document.getElementById("dashBPlusCount") && stats.total_bplus_products !== undefined) {
+        document.getElementById("dashBPlusCount").textContent = stats.total_bplus_products;
+      }
+      if (document.getElementById("dashBPlusHeight") && stats.bplus_tree_height !== undefined) {
+        document.getElementById("dashBPlusHeight").textContent = `Level ${stats.bplus_tree_height}`;
+      }
+
       const topCard = document.getElementById("dashTopAlertContent");
       if (stats.highest_priority_alert) {
         const top = stats.highest_priority_alert;
@@ -88,6 +120,7 @@ const App = {
           <strong>Location:</strong> ${top.location}
         `;
       } else {
+
         topCard.innerHTML = "No active warehouse alerts in the priority queue.";
       }
     } catch (err) {
@@ -351,6 +384,10 @@ const App = {
       if (this.graphRenderer) {
         this.graphRenderer.setData(graph.vertices, graph.edges);
       }
+      if (this.tspRenderer) {
+        this.tspRenderer.setData(graph.vertices, graph.edges);
+      }
+
 
       // Populate select dropdowns for algorithms
       this.populateLocationSelects(graph.vertices);
@@ -751,7 +788,595 @@ const App = {
       this.showFeedback(err.message, "error");
     }
   },
+
+  // -------------------------------------------------------------
+  // MODULE A: WAREHOUSE ROUTE OPTIMIZER (TSP BRANCH AND BOUND)
+  // -------------------------------------------------------------
+  async initTspLocations() {
+    try {
+      const res = await API.get("/tsp/locations");
+      this.tspLocations = res.locations || [];
+
+      // Populate Start Location Dropdown
+      const sel = document.getElementById("tspStartLocation");
+      if (sel) {
+        sel.innerHTML = this.tspLocations.map(loc => `
+          <option value="${loc.id}">${loc.id}: ${loc.name}</option>
+        `).join("");
+      }
+
+      this.renderTspLocationGrid();
+    } catch (err) {
+      console.error("Failed to load TSP locations:", err);
+    }
+  },
+
+  renderTspLocationGrid() {
+    const grid = document.getElementById("tspLocationCheckboxGrid");
+    if (!grid) return;
+
+    grid.innerHTML = this.tspLocations.map(loc => {
+      const isChecked = this.tspSelectedSet.has(loc.id);
+      return `
+        <label class="location-pill ${isChecked ? "checked" : ""}" onclick="App.toggleTspLocation(${loc.id})">
+          <input type="checkbox" ${isChecked ? "checked" : ""} onclick="event.stopPropagation(); App.toggleTspLocation(${loc.id});">
+          <span><strong>${loc.id}:</strong> ${loc.name}</span>
+        </label>
+      `;
+    }).join("");
+  },
+
+  handleTspStartChange() {
+    const startId = parseInt(document.getElementById("tspStartLocation").value, 10);
+    this.tspSelectedSet.add(startId);
+    this.renderTspLocationGrid();
+  },
+
+  toggleTspLocation(id) {
+    if (this.tspSelectedSet.has(id)) {
+      // Don't deselect if it's the start location
+      const startId = parseInt(document.getElementById("tspStartLocation").value, 10);
+      if (id === startId && this.tspSelectedSet.size > 1) {
+        this.showFeedback("Start location must remain selected in the tour.", "error");
+        return;
+      }
+      this.tspSelectedSet.delete(id);
+    } else {
+      this.tspSelectedSet.add(id);
+    }
+    this.renderTspLocationGrid();
+  },
+
+  selectAllTspLocations() {
+    this.tspLocations.forEach(loc => this.tspSelectedSet.add(loc.id));
+    this.renderTspLocationGrid();
+  },
+
+  selectSampleTspCycle() {
+    // 0: Receiving, 1: Rack A, 2: Rack B, 3: Rack C forms a direct cycle in warehouse graph!
+    this.tspSelectedSet = new Set([0, 1, 2, 3]);
+    const sel = document.getElementById("tspStartLocation");
+    if (sel) sel.value = "0";
+    this.renderTspLocationGrid();
+  },
+
+  clearTspLocations() {
+    const startId = parseInt(document.getElementById("tspStartLocation").value, 10);
+    this.tspSelectedSet = new Set([startId]);
+    this.renderTspLocationGrid();
+  },
+
+  async handleRunTsp() {
+    const startId = parseInt(document.getElementById("tspStartLocation").value, 10);
+    this.tspSelectedSet.add(startId);
+    const selectedIds = Array.from(this.tspSelectedSet);
+
+    if (selectedIds.length < 2) {
+      this.showFeedback("Please select at least 2 warehouse zones for a valid tour.", "error");
+      return;
+    }
+
+    try {
+      this.showFeedback("Computing Branch & Bound optimal tour...", "info");
+      const res = await API.post("/tsp/solve", {
+        start_location_id: startId,
+        selected_location_ids: selectedIds,
+      });
+
+      this.tspLastResult = res;
+
+      // Handle impossible tour
+      const impossibleAlert = document.getElementById("tspTourImpossibleAlert");
+      const successContent = document.getElementById("tspTourSuccessContent");
+      const resultsCard = document.getElementById("tspResultsCard");
+      const stepperCard = document.getElementById("tspStepperCard");
+
+      resultsCard.style.display = "block";
+
+      if (!res.tour_possible) {
+        impossibleAlert.style.display = "block";
+        impossibleAlert.innerHTML = `<strong>Tour Impossible:</strong> ${res.message}`;
+        successContent.style.display = "none";
+        stepperCard.style.display = "none";
+        if (this.tspRenderer) {
+          this.tspRenderer.clearHighlight();
+        }
+        return;
+      }
+
+      impossibleAlert.style.display = "none";
+      successContent.style.display = "block";
+
+      // Populate Results
+      document.getElementById("tspTotalCost").textContent = `${res.total_cost}`;
+      document.getElementById("tspNodesExplored").textContent = res.nodes_explored;
+      document.getElementById("tspBranchesPruned").textContent = res.branches_pruned;
+      document.getElementById("tspPruningEfficiency").textContent = `${res.pruning_efficiency_percent}%`;
+
+      // Render Route Chain
+      const chainDiv = document.getElementById("tspRouteChain");
+      chainDiv.innerHTML = res.optimal_route_names.map((name, idx) => `
+        <span class="route-node-pill">${name}</span>
+        ${idx < res.optimal_route_names.length - 1 ? '<span class="route-arrow">&rarr;</span>' : ""}
+      `).join("");
+
+      // Render Nearest-Neighbor Heuristic Comparison
+      const heurDiv = document.getElementById("tspHeuristicComparisonContent");
+      if (res.nearest_neighbor && res.nearest_neighbor.possible) {
+        const nn = res.nearest_neighbor;
+        const diff = nn.total_cost - res.total_cost;
+        heurDiv.innerHTML = `
+          <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+            <div><strong>Branch &amp; Bound Cost:</strong> <span class="badge badge-success">${res.total_cost} (Optimal)</span></div>
+            <div><strong>Nearest-Neighbor Cost:</strong> <span class="badge ${diff > 0 ? "badge-critical" : "badge-normal"}">${nn.total_cost} (Greedy Heuristic)</span></div>
+            <div><strong>Suboptimality Gap:</strong> ${diff > 0 ? `+${diff.toFixed(2)} extra distance` : "Matched (Greedy was lucky)"}</div>
+          </div>
+          <div style="margin-top: 0.4rem; font-size: 0.8rem; color: #475569;">
+            Heuristic Sequence: ${nn.route_names.join(" &rarr; ")}
+          </div>
+        `;
+      } else {
+        heurDiv.innerHTML = `
+          <div style="color: #991b1b;">
+            Nearest-Neighbor greedy heuristic failed to find a complete tour (trapped at a dead end), whereas Branch &amp; Bound successfully discovered the global optimum.
+          </div>
+        `;
+      }
+
+      // Highlight canvas with optimal tour
+      if (this.tspRenderer) {
+        const edgePairs = [];
+        for (let i = 0; i < res.optimal_route_ids.length - 1; i++) {
+          edgePairs.push([res.optimal_route_ids[i], res.optimal_route_ids[i + 1]]);
+        }
+        this.tspRenderer.setHighlight(res.optimal_route_ids, edgePairs, "tsp");
+      }
+
+      // Setup State Space Tree Stepper Playback
+      if (res.execution_steps && res.execution_steps.length > 0) {
+        this.tspExecutionSteps = res.execution_steps;
+        this.tspCurrentStepIdx = 0;
+        stepperCard.style.display = "block";
+        this.renderTspStep(0);
+      }
+
+      this.showFeedback(`Optimal TSP Tour found! Total cost: ${res.total_cost}`, "success");
+    } catch (err) {
+      this.showFeedback(err.message, "error");
+    }
+  },
+
+  renderTspStep(idx) {
+    if (!this.tspExecutionSteps || this.tspExecutionSteps.length === 0) return;
+    if (idx < 0) idx = 0;
+    if (idx >= this.tspExecutionSteps.length) idx = this.tspExecutionSteps.length - 1;
+    this.tspCurrentStepIdx = idx;
+
+    const step = this.tspExecutionSteps[idx];
+
+    // Counter
+    document.getElementById("tspStepCounter").textContent = `Step ${idx + 1} of ${this.tspExecutionSteps.length}`;
+
+    // Badge
+    const badge = document.getElementById("tspStateBadge");
+    const act = (step.action || "EXPLORE").toLowerCase();
+    badge.className = `state-badge ${act}`;
+    badge.textContent = step.action || "EXPLORE";
+
+    // Step state values
+    document.getElementById("tspStepCurrentNode").textContent = `Node ${step.node_id}: ${step.partial_names ? step.partial_names.join(" -> ") : step.current_name}`;
+    document.getElementById("tspStepAccumCost").textContent = `${step.accumulated_cost}`;
+    document.getElementById("tspStepLowerBound").textContent = `${step.lower_bound}`;
+    document.getElementById("tspStepBestCost").textContent = `${step.best_cost_so_far}`;
+
+    // Explanation
+    document.getElementById("tspStepReason").innerHTML = `
+      <strong>${step.action}:</strong> ${step.reason}
+    `;
+
+    // Highlight active partial branch on canvas
+    if (this.tspRenderer && step.partial_route && step.partial_route.length > 0) {
+      const edgePairs = [];
+      for (let i = 0; i < step.partial_route.length - 1; i++) {
+        edgePairs.push([step.partial_route[i], step.partial_route[i + 1]]);
+      }
+      this.tspRenderer.setHighlight(step.partial_route, edgePairs, "tsp");
+    }
+  },
+
+  tspNextStep() {
+    if (this.tspCurrentStepIdx < this.tspExecutionSteps.length - 1) {
+      this.renderTspStep(this.tspCurrentStepIdx + 1);
+    } else {
+      this.tspPause();
+    }
+  },
+
+  tspPrevStep() {
+    if (this.tspCurrentStepIdx > 0) {
+      this.renderTspStep(this.tspCurrentStepIdx - 1);
+    }
+  },
+
+  tspTogglePlay() {
+    if (this.tspIsPlaying) {
+      this.tspPause();
+    } else {
+      this.tspPlay();
+    }
+  },
+
+  tspPlay() {
+    this.tspIsPlaying = true;
+    const btn = document.getElementById("btnTspPlayPause");
+    if (btn) btn.innerHTML = "&#10074;&#10074; Pause";
+
+    const speed = parseInt(document.getElementById("tspPlaySpeed").value, 10) || 700;
+
+    this.tspPlayTimer = setInterval(() => {
+      if (this.tspCurrentStepIdx < this.tspExecutionSteps.length - 1) {
+        this.renderTspStep(this.tspCurrentStepIdx + 1);
+      } else {
+        this.tspPause();
+      }
+    }, speed);
+  },
+
+  tspPause() {
+    this.tspIsPlaying = false;
+    if (this.tspPlayTimer) {
+      clearInterval(this.tspPlayTimer);
+      this.tspPlayTimer = null;
+    }
+    const btn = document.getElementById("btnTspPlayPause");
+    if (btn) btn.innerHTML = "&#9654; Play";
+  },
+
+  tspResetPlayback() {
+    this.tspPause();
+    this.renderTspStep(0);
+  },
+
+  resetTsp() {
+    this.tspPause();
+    this.selectSampleTspCycle();
+    document.getElementById("tspResultsCard").style.display = "none";
+    document.getElementById("tspStepperCard").style.display = "none";
+    if (this.tspRenderer) {
+      this.tspRenderer.clearHighlight();
+    }
+    this.showFeedback("Route Optimizer reset to default sample warehouse cycle.", "info");
+  },
+
+  // -------------------------------------------------------------
+  // MODULE B: ADVANCED INVENTORY SEARCH (B+ TREE)
+  // -------------------------------------------------------------
+  async loadBPlusData() {
+    try {
+      const data = await API.get("/bplus/products");
+
+      // Update statistics
+      if (data.tree_stats) {
+        document.getElementById("bplusTotalProducts").textContent = data.tree_stats.total_products;
+        document.getElementById("bplusTreeHeight").textContent = data.tree_stats.tree_height;
+        document.getElementById("bplusLeafCount").textContent = data.tree_stats.leaf_nodes_count;
+        document.getElementById("bplusInternalCount").textContent = data.tree_stats.internal_nodes_count;
+        document.getElementById("bplusTreeOrder").textContent = data.tree_stats.order;
+      }
+
+      // Populate table of all products
+      const tbody = document.getElementById("bplusProductsTableBody");
+      if (tbody) {
+        tbody.innerHTML = "";
+        if (!data.products || data.products.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No products in B+ Tree index.</td></tr>`;
+        } else {
+          data.products.forEach(p => {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+              <td><span class="badge" style="background-color: #0f172a; color: #ffffff;">${p.product_id}</span></td>
+              <td><strong>${p.name}</strong></td>
+              <td>${p.category}</td>
+              <td>${p.quantity}</td>
+              <td>${p.location}</td>
+              <td><span class="badge badge-normal">${p.priority}/10</span></td>
+              <td>${p.unit_weight} kg</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+      }
+
+      // Render Tree Diagram
+      if (data.tree_hierarchy) {
+        this.renderBPlusTree(data.tree_hierarchy);
+        this.renderBPlusLeafChain(data.tree_hierarchy);
+      }
+    } catch (err) {
+      console.error("Failed to load B+ Tree data:", err);
+    }
+  },
+
+  async handleAddBPlusProduct(e) {
+    e.preventDefault();
+    const payload = {
+      product_id: document.getElementById("bpId").value.trim().toUpperCase(),
+      name: document.getElementById("bpName").value.trim(),
+      category: document.getElementById("bpCategory").value.trim(),
+      quantity: parseInt(document.getElementById("bpQuantity").value, 10),
+      location: document.getElementById("bpLocation").value.trim(),
+      priority: parseInt(document.getElementById("bpPriority").value, 10),
+      unit_weight: parseFloat(document.getElementById("bpWeight").value),
+    };
+
+    try {
+      const res = await API.post("/bplus/product", payload);
+
+      // Handle split event display
+      const splitBox = document.getElementById("bplusSplitAlert");
+      if (res.split_events && res.split_events.length > 0) {
+        splitBox.style.display = "block";
+        const eventsDesc = res.split_events.map(ev => `
+          <div>&bull; <strong>${ev.type}:</strong> ${ev.description}</div>
+        `).join("");
+        document.getElementById("bplusSplitTitle").textContent = "B+ Tree Rebalancing Split Occurred!";
+        document.getElementById("bplusSplitDesc").innerHTML = eventsDesc;
+      } else {
+        splitBox.style.display = "none";
+      }
+
+      this.showFeedback(res.message, "success");
+      document.getElementById("bplusInsertForm").reset();
+      this.loadBPlusData();
+      this.loadDashboardData();
+    } catch (err) {
+      this.showFeedback(err.message, "error");
+    }
+  },
+
+  async handleSearchBPlus() {
+    const input = document.getElementById("bplusSearchId");
+    const pid = input.value.trim().toUpperCase();
+    if (!pid) {
+      this.showFeedback("Please enter a Product ID to search.", "error");
+      return;
+    }
+
+    const resCard = document.getElementById("bplusSearchResultCard");
+    const initHint = document.getElementById("bplusSearchInitialHint");
+
+    try {
+      const res = await API.get(`/bplus/search/${encodeURIComponent(pid)}`);
+      initHint.style.display = "none";
+      resCard.style.display = "block";
+
+      document.getElementById("bplusComparisons").textContent = res.comparisons;
+      document.getElementById("bplusSearchStatusBadge").className = "badge badge-success";
+      document.getElementById("bplusSearchStatusBadge").textContent = "Found in Leaf";
+
+      const p = res.product;
+      document.getElementById("bplusSearchProductDetails").innerHTML = `
+        <strong>${p.product_id} &ndash; ${p.name}</strong><br>
+        Category: ${p.category} | Quantity: ${p.quantity} | Location: ${p.location} | Priority: ${p.priority}/10 | Weight: ${p.unit_weight} kg
+      `;
+
+      // Render search path steps through internal nodes
+      const pathBox = document.getElementById("bplusSearchPathContainer");
+      pathBox.innerHTML = res.search_path.map(step => `
+        <div class="search-step-card">
+          <strong>${step.type} (Node ${step.node_id}):</strong> Keys [${step.keys.join(", ")}]<br>
+          <span style="color: #475569; font-size: 0.8rem;">&rarr; ${step.decision}</span>
+        </div>
+      `).join("");
+
+      // Visually highlight searched nodes on tree diagram
+      document.querySelectorAll(".bplus-node").forEach(nodeEl => {
+        nodeEl.classList.remove("highlight-search");
+      });
+      res.search_path.forEach(step => {
+        const el = document.getElementById(`bpNode-${step.node_id}`);
+        if (el) el.classList.add("highlight-search");
+      });
+
+      this.showFeedback(`Product ${pid} found in B+ Tree leaf! (${res.comparisons} comparisons)`, "success");
+    } catch (err) {
+      initHint.style.display = "none";
+      resCard.style.display = "block";
+      document.getElementById("bplusSearchStatusBadge").className = "badge badge-critical";
+      document.getElementById("bplusSearchStatusBadge").textContent = "Not Found";
+      document.getElementById("bplusSearchProductDetails").innerHTML = `<span style="color: #dc2626;">${err.message}</span>`;
+      document.getElementById("bplusSearchPathContainer").innerHTML = "";
+      this.showFeedback(err.message, "error");
+    }
+  },
+
+  async handleRangeBPlus() {
+    const minId = document.getElementById("bplusRangeMin").value.trim().toUpperCase();
+    const maxId = document.getElementById("bplusRangeMax").value.trim().toUpperCase();
+
+    if (!minId || !maxId) {
+      this.showFeedback("Please provide both Min and Max Product IDs.", "error");
+      return;
+    }
+
+    try {
+      const res = await API.post("/bplus/range", {
+        min_product_id: minId,
+        max_product_id: maxId,
+      });
+
+      const container = document.getElementById("bplusRangeResultsContainer");
+      container.style.display = "block";
+
+      document.getElementById("bplusRangeCount").textContent = res.count;
+      document.getElementById("bplusRangeLeavesCount").textContent = res.leaves_traversed_count;
+      document.getElementById("bplusRangeLeavesChain").textContent = `Linked Leaves Scanned: Node ${res.leaves_traversed_ids.join(" &rarr; Node ")}`;
+
+      const tbody = document.getElementById("bplusRangeTableBody");
+      tbody.innerHTML = "";
+
+      if (!res.records || res.records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: #64748b;">No products found in range '${minId}' to '${maxId}'.</td></tr>`;
+      } else {
+        res.records.forEach(p => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td><span class="badge" style="background-color: #0f172a; color: #ffffff;">${p.product_id}</span></td>
+            <td><strong>${p.name}</strong></td>
+            <td>${p.category}</td>
+            <td>${p.quantity}</td>
+            <td>${p.location}</td>
+            <td><span class="badge badge-normal">${p.priority}/10</span></td>
+            <td>${p.unit_weight} kg</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      this.showFeedback(`Range query complete: ${res.count} products matched across ${res.leaves_traversed_count} linked leaves.`, "success");
+    } catch (err) {
+      this.showFeedback(err.message, "error");
+    }
+  },
+
+  async resetBPlusTree() {
+    try {
+      await API.post("/bplus/reset");
+      document.getElementById("bplusSplitAlert").style.display = "none";
+      document.getElementById("bplusSearchResultCard").style.display = "none";
+      document.getElementById("bplusSearchInitialHint").style.display = "block";
+      document.getElementById("bplusRangeResultsContainer").style.display = "none";
+      this.loadBPlusData();
+      this.loadDashboardData();
+      this.showFeedback("B+ Tree index reset to default sample warehouse inventory.", "success");
+    } catch (err) {
+      this.showFeedback(err.message, "error");
+    }
+  },
+
+  renderBPlusTree(hierarchy) {
+    const container = document.getElementById("bplusTreeContainer");
+    if (!container || !hierarchy || !hierarchy.levels) return;
+
+    container.innerHTML = "";
+
+    hierarchy.levels.forEach((levelNodes, lvlIdx) => {
+      const levelDiv = document.createElement("div");
+      levelDiv.className = "bplus-level";
+
+      const isRoot = lvlIdx === 0;
+      const isLeafLevel = lvlIdx === hierarchy.height - 1;
+
+      const labelDiv = document.createElement("div");
+      labelDiv.className = "bplus-level-label";
+      labelDiv.textContent = isRoot
+        ? (isLeafLevel ? "Level 0: Root (Leaf)" : "Level 0: Root")
+        : (isLeafLevel ? `Level ${lvlIdx}: Leaves (Data)` : `Level ${lvlIdx}: Internal (Separators)`);
+      levelDiv.appendChild(labelDiv);
+
+      levelNodes.forEach(node => {
+        const nodeCard = document.createElement("div");
+        nodeCard.id = `bpNode-${node.node_id}`;
+        nodeCard.className = `bplus-node ${node.is_leaf ? "leaf-node" : "internal-node"}`;
+
+        // Header
+        const header = document.createElement("div");
+        header.className = "bplus-node-header";
+        header.innerHTML = `
+          <span>Node #${node.node_id}</span>
+          <span style="color: ${node.is_leaf ? "#059669" : "#2563eb"};">${node.is_leaf ? "LEAF" : "INTERNAL"}</span>
+        `;
+        nodeCard.appendChild(header);
+
+        // Keys
+        const keysDiv = document.createElement("div");
+        keysDiv.className = "bplus-node-keys";
+        if (node.keys && node.keys.length > 0) {
+          node.keys.forEach(k => {
+            const span = document.createElement("span");
+            span.className = "bplus-key-badge";
+            span.textContent = k;
+            keysDiv.appendChild(span);
+          });
+        } else {
+          keysDiv.innerHTML = `<span style="color: #94a3b8; font-size: 0.75rem;">(Empty)</span>`;
+        }
+        nodeCard.appendChild(keysDiv);
+
+        // If Leaf: Show record summary & next link indicator
+        if (node.is_leaf) {
+          const recCount = (node.records || []).length;
+          const info = document.createElement("div");
+          info.style.fontSize = "0.7rem";
+          info.style.color = "#475569";
+          info.style.marginTop = "0.3rem";
+          info.style.textAlign = "center";
+          info.textContent = `${recCount} record${recCount === 1 ? "" : "s"}`;
+          nodeCard.appendChild(info);
+
+          if (node.next_id) {
+            const linkInd = document.createElement("div");
+            linkInd.className = "leaf-link-indicator";
+            linkInd.innerHTML = `&rarr; next: Node #${node.next_id}`;
+            nodeCard.appendChild(linkInd);
+          } else {
+            const linkInd = document.createElement("div");
+            linkInd.className = "leaf-link-indicator";
+            linkInd.style.color = "#94a3b8";
+            linkInd.textContent = "&bull; tail leaf (null)";
+            nodeCard.appendChild(linkInd);
+          }
+        } else {
+          // Internal: show child references
+          const childInfo = document.createElement("div");
+          childInfo.style.fontSize = "0.7rem";
+          childInfo.style.color = "#2563eb";
+          childInfo.style.marginTop = "0.3rem";
+          childInfo.style.textAlign = "center";
+          childInfo.textContent = `${(node.children_ids || []).length} children`;
+          nodeCard.appendChild(childInfo);
+        }
+
+        levelDiv.appendChild(nodeCard);
+      });
+
+      container.appendChild(levelDiv);
+    });
+  },
+
+  renderBPlusLeafChain(hierarchy) {
+    const chainBar = document.getElementById("bplusLeafChainBar");
+    if (!chainBar || !hierarchy || !hierarchy.leaf_chain_ids) return;
+
+    chainBar.innerHTML = hierarchy.leaf_chain_ids.map((id, idx) => `
+      <div style="background-color: #f0fdf4; border: 1px solid #10b981; border-radius: 4px; padding: 0.35rem 0.6rem; font-size: 0.75rem; font-family: var(--font-mono); color: #065f46; white-space: nowrap;">
+        <strong>Leaf Node #${id}</strong>
+      </div>
+      ${idx < hierarchy.leaf_chain_ids.length - 1 ? '<span style="color: #10b981; font-weight: bold;">&rarr; next &rarr;</span>' : '<span style="color: #94a3b8; font-weight: bold;">&rarr; NULL</span>'}
+    `).join("");
+  },
 };
+
 
 window.App = App;
 
