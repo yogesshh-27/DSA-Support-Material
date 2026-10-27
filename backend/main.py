@@ -615,12 +615,25 @@ def reset_bplus_tree():
 # FRONTEND STATIC FILES SERVING
 # =====================================================================
 
-if FRONTEND_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
+static_candidates = [
+    FRONTEND_DIR,
+    BASE_DIR.parent / "public" / "static",
+    BASE_DIR.parent / "public",
+]
+mounted_dir = next((d for d in static_candidates if d.exists()), None)
+if mounted_dir:
+    app.mount("/static", StaticFiles(directory=str(mounted_dir)), name="static")
 
-    @app.get("/", include_in_schema=False)
-    def serve_frontend_index():
-        index_file = FRONTEND_DIR / "index.html"
-        if index_file.exists():
-            return FileResponse(index_file)
-        return {"message": "Frontend index.html not found"}
+
+@app.get("/", include_in_schema=False)
+def serve_frontend_index():
+    candidates = [
+        FRONTEND_DIR / "index.html",
+        BASE_DIR.parent / "public" / "index.html",
+        BASE_DIR.parent / "index.html",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return FileResponse(candidate)
+    return {"message": "Frontend index.html not found"}
+

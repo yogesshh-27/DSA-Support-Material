@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/static/(.*)",
+      "destination": "/public/static/$1"
+    },
+    {
+      "source": "/",
+      "destination": "/public/index.html"
+    },
+    {
+      "source": "/(inventory|alerts|graph|dijkstra|prim|floyd-warshall|knapsack|tsp|bplus|dashboard|docs|openapi.json)(.*)",
+      "destination": "/api/index.py"
+    },
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
+    }
+  ]
+}
