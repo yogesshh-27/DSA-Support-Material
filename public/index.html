@@ -4,15 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Smart Warehouse Inventory Management Platform | DSA-II PBL</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
 
   <!-- SIDEBAR NAVIGATION -->
-  <aside class="app-sidebar">
+  <aside class="app-sidebar" id="appSidebar">
     <div class="sidebar-header">
-      <h1>Smart Warehouse</h1>
-      <p>DSA-II Academic Prototype</p>
+      <div class="brand-badge">
+        <span class="brand-icon">📦</span>
+        <div>
+          <h1>Smart Warehouse</h1>
+          <p>DSA-II Autonomous OS</p>
+        </div>
+      </div>
+      <div class="system-status-indicator">
+        <span class="status-dot"></span>
+        <span class="status-text">SYSTEM ONLINE</span>
+      </div>
     </div>
 
     <nav class="sidebar-nav">
@@ -51,16 +64,39 @@
       </a>
     </nav>
 
-
     <div class="sidebar-footer">
-      <div>BTech CSE – DSA-II PBL</div>
-      <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.2rem;">All Algorithms Self-Implemented</div>
+      <div><strong>BTech CSE</strong> – DSA-II PBL</div>
+      <div style="font-size: 0.68rem; color: #64748b; margin-top: 0.25rem;">All Algorithms Self-Implemented</div>
     </div>
   </aside>
 
   <!-- MAIN VIEWPORT -->
   <main class="app-main">
+    <!-- TOP NAVIGATION & STATUS BAR -->
+    <header class="app-topbar">
+      <div class="topbar-left">
+        <button id="sidebarToggle" class="btn btn-sm mobile-only" aria-label="Toggle Menu">
+          ☰ Menu
+        </button>
+        <div class="breadcrumb-container">
+          <span class="breadcrumb-root">Warehouse OS</span>
+          <span class="breadcrumb-sep">/</span>
+          <span id="currentSectionTitle" class="breadcrumb-current">Dashboard</span>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="topbar-chip">
+          <span class="pulse-dot"></span>
+          <span>DSA Engine: Active (Units 1–5)</span>
+        </div>
+        <a href="/docs" target="_blank" class="topbar-btn">
+          ⚡ API Docs
+        </a>
+      </div>
+    </header>
+
     <div id="feedbackAlert" class="feedback-msg"></div>
+
 
     <!-- ============================================================== -->
     <!-- SECTION 1: DASHBOARD -->
@@ -1013,7 +1049,7 @@
       <div class="card" id="tspResultsCard" style="display: none; margin-bottom: 1.5rem;">
         <div class="card-title">4. Route Optimization Results &amp; Search Statistics</div>
 
-        <div id="tspTourImpossibleAlert" style="display: none; padding: 1rem; background-color: #fee2e2; border: 1px solid #ef4444; border-radius: 4px; color: #991b1b; margin-bottom: 1rem; font-size: 0.9rem;">
+        <div id="tspTourImpossibleAlert" style="display: none; padding: 1rem; background: var(--rose-subtle); border: 1px solid rgba(244, 63, 94, 0.4); border-radius: var(--radius-md); color: #fda4af; margin-bottom: 1rem; font-size: 0.9rem;">
           <strong>No Complete Tour Possible:</strong> The selected warehouse locations do not have direct corridor connections to form a closed Hamiltonian cycle.
         </div>
 
@@ -1031,12 +1067,12 @@
             </div>
             <div class="stat-widget">
               <div class="stat-title">Branches Pruned</div>
-              <div class="stat-number" style="color: #dc2626;" id="tspBranchesPruned">-</div>
+              <div class="stat-number" style="color: var(--rose);" id="tspBranchesPruned">-</div>
               <div class="stat-desc">Subtrees eliminated by bound</div>
             </div>
             <div class="stat-widget">
               <div class="stat-title">Pruning Efficiency</div>
-              <div class="stat-number" style="color: #16a34a;" id="tspPruningEfficiency">-</div>
+              <div class="stat-number" style="color: var(--emerald);" id="tspPruningEfficiency">-</div>
               <div class="stat-desc">Search space eliminated</div>
             </div>
           </div>

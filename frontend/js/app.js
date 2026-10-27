@@ -51,11 +51,39 @@ const App = {
         e.preventDefault();
         const sectionId = link.getAttribute("data-section");
         this.navigateTo(sectionId);
+        // On mobile, close sidebar drawer
+        document.getElementById("appSidebar")?.classList.remove("open");
       });
     });
+
+    const toggleBtn = document.getElementById("sidebarToggle");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        document.getElementById("appSidebar")?.classList.toggle("open");
+      });
+    }
   },
 
   navigateTo(sectionId) {
+    const titles = {
+      dashboard: "Dashboard Overview",
+      inventory: "Inventory Management (AVL Tree)",
+      alerts: "Priority Dispatch (Max Heap)",
+      graph: "Warehouse Topological Graph",
+      dijkstra: "Shortest Path Routing (Dijkstra)",
+      prim: "Aisle Optimization (Prim MST)",
+      floyd: "All-Pairs Route Matrix (Floyd-Warshall)",
+      knapsack: "Weight-Limited Dispatch (0/1 Knapsack)",
+      tsp: "Picker Route Optimization (TSP Branch & Bound)",
+      bplus: "Multi-Attribute Product Search (B+ Tree)",
+      complexity: "Algorithm Time & Space Complexity",
+    };
+
+    const breadcrumbElem = document.getElementById("currentSectionTitle");
+    if (breadcrumbElem && titles[sectionId]) {
+      breadcrumbElem.textContent = titles[sectionId];
+    }
+
     document.querySelectorAll(".nav-link").forEach(link => {
       link.classList.toggle("active", link.getAttribute("data-section") === sectionId);
     });
@@ -88,6 +116,7 @@ const App = {
     if (sectionId === "alerts") this.loadAlertsData();
     if (sectionId === "bplus") this.loadBPlusData();
   },
+
 
   // -------------------------------------------------------------
   // DASHBOARD
@@ -1350,7 +1379,7 @@ const App = {
           // Internal: show child references
           const childInfo = document.createElement("div");
           childInfo.style.fontSize = "0.7rem";
-          childInfo.style.color = "#2563eb";
+          childInfo.style.color = "#93c5fd";
           childInfo.style.marginTop = "0.3rem";
           childInfo.style.textAlign = "center";
           childInfo.textContent = `${(node.children_ids || []).length} children`;
@@ -1369,13 +1398,14 @@ const App = {
     if (!chainBar || !hierarchy || !hierarchy.leaf_chain_ids) return;
 
     chainBar.innerHTML = hierarchy.leaf_chain_ids.map((id, idx) => `
-      <div style="background-color: #f0fdf4; border: 1px solid #10b981; border-radius: 4px; padding: 0.35rem 0.6rem; font-size: 0.75rem; font-family: var(--font-mono); color: #065f46; white-space: nowrap;">
+      <div style="background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.775rem; font-family: var(--font-mono); color: #6ee7b7; white-space: nowrap; box-shadow: 0 0 10px rgba(16, 185, 129, 0.15);">
         <strong>Leaf Node #${id}</strong>
       </div>
-      ${idx < hierarchy.leaf_chain_ids.length - 1 ? '<span style="color: #10b981; font-weight: bold;">&rarr; next &rarr;</span>' : '<span style="color: #94a3b8; font-weight: bold;">&rarr; NULL</span>'}
+      ${idx < hierarchy.leaf_chain_ids.length - 1 ? '<span style="color: var(--emerald); font-weight: bold; font-family: var(--font-mono);">&rarr; next &rarr;</span>' : '<span style="color: #64748b; font-weight: bold; font-family: var(--font-mono);">&rarr; NULL</span>'}
     `).join("");
   },
 };
+
 
 
 window.App = App;
